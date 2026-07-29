@@ -1,0 +1,4 @@
+Condition,Representation_Distance
+Noise (std=0.2),29.549263
+Distractors (n=2),9.897127
+Viewpoint (max_angle=30),0.8089621

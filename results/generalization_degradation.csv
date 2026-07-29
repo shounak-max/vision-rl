@@ -1,0 +1,5 @@
+Condition,Mean_CLE,Success_Rate,Representation_Distance
+Baseline,20.571463,0.189,
+Noise (std=0.2),65.39394,0.0045,29.549263
+Distractors (n=2),39.093643,0.0405,9.897127
+Viewpoint (max_angle=30),20.107674,0.129,0.8089621
