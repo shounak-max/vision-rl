@@ -1,0 +1,3 @@
+Configuration,OOD_Success_Rate,OOD_Mean_CLE
+Full Model (with DataAug),0.0035,61.48564
+No Data Augmentation,0.005,62.39739

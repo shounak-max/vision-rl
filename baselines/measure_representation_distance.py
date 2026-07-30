@@ -57,16 +57,17 @@ def measure_distance(model_path, env_id):
         distances.append({"Condition": name, "Representation_Distance": dist})
         
     df = pd.DataFrame(distances)
-    df.to_csv("results/representation_distances.csv", index=False)
-    print("Saved distances to results/representation_distances.csv")
+    os.makedirs("results/tables", exist_ok=True)
+    df.to_csv("results/tables/representation_distances.csv", index=False)
+    print("Saved distances to results/tables/representation_distances.csv")
     print(df)
     
     # merge with generalization results if it exists
-    if os.path.exists("results/generalization_results.csv"):
-        gen_df = pd.read_csv("results/generalization_results.csv")
+    if os.path.exists("results/tables/generalization_results.csv"):
+        gen_df = pd.read_csv("results/tables/generalization_results.csv")
         merged = pd.merge(gen_df, df, on="Condition", how="left")
-        merged.to_csv("results/generalization_degradation.csv", index=False)
-        print("Merged with generalization results -> results/generalization_degradation.csv")
+        merged.to_csv("results/tables/generalization_degradation.csv", index=False)
+        print("Merged with generalization results -> results/tables/generalization_degradation.csv")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

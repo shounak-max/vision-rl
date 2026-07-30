@@ -4,7 +4,7 @@ import gymnasium as gym
 import numpy as np
 import envs.tracking_envs
 
-def generate_offline_dataset(env_id="ActiveTracking-v0", num_transitions=5000, output_file="results/offline_dataset.npz"):
+def generate_offline_dataset(env_id="ActiveTracking-v0", num_transitions=5000, output_file="results/datasets/offline_dataset.npz"):
     print(f"Generating V-D4RL-lite offline dataset using {env_id}...")
     env = gym.make(env_id)
     

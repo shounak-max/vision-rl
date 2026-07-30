@@ -34,8 +34,8 @@ def evaluate_model(model_path, env_id, n_eval_episodes=10, wrapper_class=None, w
     env.close()
     return metrics
 
-def run_generalization_tests(model_path, env_id, output_csv="results/generalization_results.csv"):
-    os.makedirs("results", exist_ok=True)
+def run_generalization_tests(model_path, env_id, output_csv="results/tables/generalization_results.csv"):
+    os.makedirs("results/tables", exist_ok=True)
     results = []
     
     # Baseline (no shift)

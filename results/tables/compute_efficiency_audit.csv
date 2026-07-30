@@ -1,0 +1,3 @@
+Algorithm,Parameters,Inference_Latency_ms,Inference_FPS,Training_FPS (CPU),Model_Size_MB
+PPO (CNN),"1,683,621",3.31 ± 3.21,302.2,~55 - 60 FPS,6.42 MB
+SAC (CNN),"6,035,944",3.39 ± 2.66,295.3,~14 - 15 FPS,23.03 MB
