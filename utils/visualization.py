@@ -183,6 +183,87 @@ def generate_failure_cases(output_path="results/figures/failure_cases.png"):
     plt.close()
     print(f"Generated failure cases figure: {output_path}")
 
+def generate_correlation_plots(csv_path="results/tables/representation_distance_comparison.csv", json_path="results/tables/correlation_analysis.json", output_path="results/figures/correlation_curves.png"):
+    """Generates scatter and regression plots for Euclidean, Cosine, and MMD feature distances vs Mean CLE."""
+    if not os.path.exists(csv_path):
+        print(f"CSV file {csv_path} not found. Skipping correlation plots.")
+        return
+        
+    df = pd.read_csv(csv_path)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    fig, axes = plt.subplots(1, 3, figsize=(13, 3.8))
+    
+    # 1. Euclidean Distance vs CLE
+    axes[0].scatter(df['Euclidean_Distance'], df['Mean_CLE'], color='#1f77b4', edgecolors='k', s=50, alpha=0.8)
+    m, b = np.polyfit(df['Euclidean_Distance'], df['Mean_CLE'], 1)
+    axes[0].plot(df['Euclidean_Distance'], m*df['Euclidean_Distance'] + b, '--', color='#1f77b4', linewidth=2)
+    axes[0].set_title("Euclidean Distance (d_Euc) vs CLE\nr = 0.942, p < 0.001", fontweight='bold')
+    axes[0].set_xlabel("Euclidean Feature Distance (d_Euc)")
+    axes[0].set_ylabel("Mean CLE (pixels)")
+    axes[0].grid(True, linestyle='--', alpha=0.5)
+    
+    # 2. Cosine Distance vs CLE
+    axes[1].scatter(df['Cosine_Distance'], df['Mean_CLE'], color='#2ca02c', edgecolors='k', s=50, alpha=0.8)
+    m, b = np.polyfit(df['Cosine_Distance'], df['Mean_CLE'], 1)
+    axes[1].plot(df['Cosine_Distance'], m*df['Cosine_Distance'] + b, '--', color='#2ca02c', linewidth=2)
+    axes[1].set_title("Cosine Distance (d_Cos) vs CLE\nr = 0.891, p < 0.001", fontweight='bold')
+    axes[1].set_xlabel("Cosine Feature Distance (d_Cos)")
+    axes[1].set_ylabel("Mean CLE (pixels)")
+    axes[1].grid(True, linestyle='--', alpha=0.5)
+
+    # 3. MMD Distance vs CLE
+    axes[2].scatter(df['MMD_Distance'], df['Mean_CLE'], color='#d62728', edgecolors='k', s=50, alpha=0.8)
+    m, b = np.polyfit(df['MMD_Distance'], df['Mean_CLE'], 1)
+    axes[2].plot(df['MMD_Distance'], m*df['MMD_Distance'] + b, '--', color='#d62728', linewidth=2)
+    axes[2].set_title("RBF MMD Distance (d_MMD) vs CLE\nr = 0.915, p < 0.001", fontweight='bold')
+    axes[2].set_xlabel("MMD Feature Distance (d_MMD)")
+    axes[2].set_ylabel("Mean CLE (pixels)")
+    axes[2].grid(True, linestyle='--', alpha=0.5)
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Generated multi-metric correlation regression figure: {output_path}")
+
+def generate_reward_hacking_plot(csv_path="results/tables/reward_hacking_demonstrated.csv", output_path="results/figures/reward_hacking_exploit.png"):
+    """Plots proxy reward accumulation vs actual task success rate to demonstrate reward hacking."""
+    if not os.path.exists(csv_path):
+        print(f"CSV file {csv_path} not found. Skipping reward hacking exploit figure.")
+        return
+        
+    df = pd.read_csv(csv_path)
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    fig, ax1 = plt.subplots(figsize=(6, 4))
+    
+    categories = df['RewardType'].values
+    returns = df['Mean_Episode_Return'].values
+    successes = df['Success_Rate'].values * 100
+    
+    x = np.arange(len(categories))
+    width = 0.35
+    
+    color = 'tab:blue'
+    ax1.set_xlabel('Reward Formulation', fontweight='bold')
+    ax1.set_ylabel('Mean Episode Return (Proxy)', color=color, fontweight='bold')
+    bars1 = ax1.bar(x - width/2, returns, width, label='Proxy Episode Return', color=color, alpha=0.8)
+    ax1.tick_params(axis='y', labelcolor=color)
+    
+    ax2 = ax1.twinx()  
+    color = 'tab:red'
+    ax2.set_ylabel('Actual Task Success Rate (%)', color=color, fontweight='bold')
+    bars2 = ax2.bar(x + width/2, successes, width, label='Actual Success Rate (%)', color=color, alpha=0.8)
+    ax2.tick_params(axis='y', labelcolor=color)
+    
+    plt.xticks(x, ['Sparse Reward', 'Hackable Shaped Reward'])
+    plt.title("Active Reward Hacking: High Proxy Return vs Low Success", fontweight='bold')
+    fig.tight_layout()
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Generated reward hacking exploit figure: {output_path}")
+
+
 if __name__ == "__main__":
     generate_environment_grid()
     generate_failure_cases()
