@@ -1,0 +1,4 @@
+Seed,Scratch_Target_CLE,ZeroShot_Jumpstart_CLE,FineTuned_Target_CLE,Scratch_Success,FineTuned_Success
+0,64.2,58.1,49.3,0.002,0.018
+42,62.8,57.4,47.9,0.004,0.022
+100,63.5,59.0,48.6,0.003,0.02
