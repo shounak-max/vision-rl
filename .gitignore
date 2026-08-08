@@ -68,3 +68,4 @@ Thumbs.db
 
 # Large research papers
 *.pdf
+baselines/deploy_remote_gpu.py
