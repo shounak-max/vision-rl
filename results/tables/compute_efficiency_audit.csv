@@ -1,4 +1,3 @@
 Algorithm,Policy_Parameters,Inference_Latency_ms,Inference_FPS,Model_Size_MB,CPU_WallClock_1M_Steps_Est_Hours
-PPO (NatureCNN),1683621,3.12,320.5,6.42,0.87
-SAC (NatureCNN),6035944,3.25,307.7,23.03,0.90
-Pre-Trained ResNet-18,11176512,4.85,206.2,44.70,1.35
+PPO (NatureCNN),1683621,1.54,650.2,6.55,0.43
+SAC (NatureCNN),6035944,1.54,649.0,23.17,0.43

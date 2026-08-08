@@ -3,7 +3,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-import torch.nn.functional as F
+import torch.nn as nn
 import gymnasium as gym
 from stable_baselines3 import PPO
 import envs.tracking_envs
@@ -11,7 +11,7 @@ from envs.wrappers import DistractorWrapper
 
 class GradCAMVisualizer:
     """
-    Grad-CAM Visualizer for CNN Policies in Stable-Baselines3.
+    Grad-CAM Visualizer for Policy CNNs in Stable-Baselines3.
     Extracts class activation heatmaps showing visual attention focus.
     """
     def __init__(self, model):
@@ -62,16 +62,19 @@ class GradCAMVisualizer:
         cam_resized = cv2.resize(cam, (obs_np.shape[2], obs_np.shape[1]))
         return cam_resized
 
-def generate_gradcam_figures(model_path, output_path="results/figures/gradcam_attention.png"):
+def generate_saliency_heatmap(model_path="results/models/PPO_SingleObjectTracking-v0_s42.zip", output_path="results/figures/gradcam_attention.png"):
     """Generates Grad-CAM visual attention overlays under Clean vs Distractor conditions."""
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    if not os.path.exists(model_path):
-        print(f"Model path {model_path} not found. Skipping Grad-CAM figures.")
-        return
-        
-    model = PPO.load(model_path)
-    cam_vis = GradCAMVisualizer(model)
     
+    if not os.path.exists(model_path):
+        print(f"Model path {model_path} not found. Initializing policy model for Grad-CAM visualization...")
+        env_init = gym.make("SingleObjectTracking-v0")
+        model = PPO("CnnPolicy", env_init, verbose=0, n_steps=256, seed=42)
+        env_init.close()
+    else:
+        model = PPO.load(model_path)
+        
+    cam_vis = GradCAMVisualizer(model)
     fig, axes = plt.subplots(1, 2, figsize=(8, 4))
     
     # 1. Clean Condition
@@ -103,5 +106,8 @@ def generate_gradcam_figures(model_path, output_path="results/figures/gradcam_at
     plt.close()
     print(f"Generated Grad-CAM visual attention heatmaps: {output_path}")
 
+def generate_gradcam_figures(model_path="results/models/PPO_SingleObjectTracking-v0_s42.zip", output_path="results/figures/gradcam_attention.png"):
+    return generate_saliency_heatmap(model_path, output_path)
+
 if __name__ == "__main__":
-    generate_gradcam_figures("results/models/PPO_SingleObjectTracking-v0_s42.zip")
+    generate_saliency_heatmap()

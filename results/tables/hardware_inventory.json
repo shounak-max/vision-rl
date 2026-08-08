@@ -1,12 +1,12 @@
 {
-  "OS": "Windows-10-10.0.22631-SP0",
-  "Python_Version": "3.10.11",
-  "PyTorch_Version": "2.2.0",
-  "CPU_Architecture": "Intel(R) Core(TM) i9-13900K @ 3.00GHz",
-  "Physical_CPU_Cores": 24,
-  "Logical_CPU_Cores": 32,
-  "System_RAM_GB": 64.0,
-  "CUDA_Available": true,
-  "GPU_Model": "NVIDIA GeForce RTX 4090",
-  "CUDA_Version": "12.1"
+  "OS": "Windows-10-10.0.26200-SP0",
+  "Python_Version": "3.10.0",
+  "PyTorch_Version": "2.13.0+cpu",
+  "CPU_Architecture": "Intel64 Family 6 Model 186 Stepping 2, GenuineIntel",
+  "Physical_CPU_Cores": 8,
+  "Logical_CPU_Cores": 12,
+  "System_RAM_GB": 15.65,
+  "CUDA_Available": false,
+  "GPU_Model": "N/A (CPU Execution)",
+  "CUDA_Version": "N/A"
 }
