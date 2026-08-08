@@ -33,12 +33,13 @@ To benchmark algorithmic performance across 5 distinct random seeds (`[0, 42, 10
 
 To evaluate whether representation learning on `SingleObjectTracking-v0` (Source Task) yields downstream utility, we transferred policy weights to `ActiveTracking-v0` (Target Task) and compared against training from scratch.
 
-### Table 2: Cross-Task Transfer Learning Evaluation (`SingleObjectTracking-v0` $\to$ `ActiveTracking-v0`)
+### Table 2: Cross-Task Transfer Learning Evaluation (`SingleObjectTracking-v0` $\to$ `ActiveTracking-v0`, 5 Seeds, $\pm \text{CI}_{95}$)
 
-| Training Paradigm | Zero-Shot Jumpstart CLE | Fine-Tuned Target CLE | Final Success Rate | Relative Error Reduction |
+| Training Paradigm | Zero-Shot Jumpstart CLE | Fine-Tuned Target CLE | Final Target Success Rate | Relative Baseline CLE |
 | :--- | :---: | :---: | :---: | :---: |
-| **Scratch Policy (Target Task)** | — | $77.95 \pm 31.51$ px | $0.30 \pm 0.10\%$ | Baseline |
-| **Transferred & Fine-Tuned Policy** | $96.85 \pm 16.53$ px | **$48.60 \pm 1.40$ px** | **$2.00 \pm 0.40\%$** | **$29.35$ px Fine-Tuned CLE Drop** |
+| **Scratch Policy (Target Task)** | — | **$29.31 \pm 13.61$ px** | $37.25 \pm 14.18\%$ | Baseline |
+| **Zero-Shot Jumpstart Policy** | $78.71 \pm 13.58$ px | — | — | Out-of-Domain Jumpstart |
+| **Transferred & Fine-Tuned Policy** | — | $63.26 \pm 26.04$ px | $16.40 \pm 12.87\%$ | Transferred Adaptation |
 
 ---
 

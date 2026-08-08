@@ -37,7 +37,7 @@ Reinforcement learning from high-dimensional visual observations (Visual RL) is 
 1. **Lightweight Continuous Pursuit Suite:** We introduce four fast 2D continuous control visual environments isolating spatial tracking pursuit, ego-motion viewports, and multi-stage visual navigation.
 2. **Hungarian Multi-Object Tracking Metric (MOTA):** We integrate bipartite Hungarian matching (`scipy.optimize.linear_sum_assignment`) to evaluate tracking accuracy independently of arbitrary tracker indexing.
 3. **Multi-Algorithm Baseline Evaluation:** We benchmark 6 distinct paradigms (Random, PPO, SAC, TD3, Behavior Cloning, DrQ-v2) with 95% Confidence Intervals ($\pm \text{CI}_{95}$) across 5 random seeds, demonstrating SAC as the top performer ($25.85$ px CLE, $p < 0.0001$).
-4. **Downstream Cross-Task Transfer Validation:** We demonstrate that pre-training visual feature encoders on tracking provides a fine-tuned target error reduction down to **$48.60$ px** on `ActiveTracking-v0`.
+4. **Downstream Cross-Task Transfer Validation:** We evaluate cross-task transfer from `SingleObjectTracking-v0` to `ActiveTracking-v0` across 5 random seeds.
 5. **Statistical Verification of Representation Distance Theory:** We demonstrate across 16 continuous corruption severities that Euclidean centroid feature distance $d_{\text{Euc}}$ strongly predicts performance degradation ($r = -0.8099, p < 0.001$), outperforming Cosine distance and MMD.
 6. **Grad-CAM Visual Attention Saliency:** We derive action-norm gradient activation mapping on policy CNNs, demonstrating visually that performance drop under distractors is caused by visual attention hijack.
 7. **Decoupled Representation Bottleneck Benchmark:** We compare Scratch NatureCNN policies against Deep Residual Vision Backbones, demonstrating a **$11.2\times$ performance gain** when visual features are pre-aligned.
@@ -81,14 +81,13 @@ We evaluated 6 representative algorithms across 5 distinct random seeds (`[0, 42
 
 To evaluate whether pre-training visual feature representation encoders on `SingleObjectTracking-v0` (Source Task) provides downstream utility, we transferred policy weights to `ActiveTracking-v0` (Target Task) and compared against training from scratch.
 
-### Table 2: Cross-Task Transfer Learning Evaluation (`SingleObjectTracking-v0` $\to$ `ActiveTracking-v0`)
+### Table 2: Cross-Task Transfer Learning Evaluation (`SingleObjectTracking-v0` $\to$ `ActiveTracking-v0`, 5 Seeds, $\pm \text{CI}_{95}$)
 
-| Training Paradigm | Zero-Shot Jumpstart CLE | Fine-Tuned Target CLE | Final Success Rate | Relative Error Reduction |
+| Training Paradigm | Zero-Shot Jumpstart CLE | Fine-Tuned Target CLE | Final Target Success Rate | Relative Baseline CLE |
 | :--- | :---: | :---: | :---: | :---: |
-| **Scratch Policy (Target Task)** | — | $77.95 \pm 31.51$ px | $0.30 \pm 0.10\%$ | Baseline |
-| **Transferred & Fine-Tuned Policy** | $96.85 \pm 16.53$ px | **$48.60 \pm 1.40$ px** | **$2.00 \pm 0.40\%$** | **$29.35$ px Fine-Tuned CLE Drop** |
-
-*Finding:* Pre-training visual representation features on tracking reduces final target tracking error down to **$48.60$ px**, providing strong empirical evidence of downstream benchmark predictive utility.
+| **Scratch Policy (Target Task)** | — | **$29.31 \pm 13.61$ px** | $37.25 \pm 14.18\%$ | Baseline |
+| **Zero-Shot Jumpstart Policy** | $78.71 \pm 13.58$ px | — | — | Out-of-Domain Jumpstart |
+| **Transferred & Fine-Tuned Policy** | — | $63.26 \pm 26.04$ px | $16.40 \pm 12.87\%$ | Transferred Adaptation |
 
 ---
 
@@ -147,4 +146,4 @@ $$L_{\text{Grad-CAM}} = \text{ReLU}\left(\sum_k \alpha_k A^k\right)$$
 
 ## 9. Conclusion & Future Work
 
-This paper presented a lightweight, high-throughput benchmark suite for continuous visual pursuit. We benchmarked 6 algorithmic baselines with 95% CIs demonstrating SAC as the top performer ($25.85$ px CLE), demonstrated downstream cross-task transfer error reductions ($48.60$ px CLE), empirically validated representation distance generalization bounds ($r = -0.8099, p < 0.001$), introduced Hungarian MOTA metrics and Grad-CAM saliency heatmaps, and demonstrated an $11.2\times$ performance gain when using deep residual vision backbones.
+This paper presented a lightweight, high-throughput benchmark suite for continuous visual pursuit. We benchmarked 6 algorithmic baselines with 95% CIs demonstrating SAC as the top performer ($25.85$ px CLE), empirically validated representation distance generalization bounds ($r = -0.8099, p < 0.001$), introduced Hungarian MOTA metrics and Grad-CAM saliency heatmaps, and demonstrated an $11.2\times$ performance gain when using deep residual vision backbones.
