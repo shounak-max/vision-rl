@@ -27,17 +27,17 @@
 \maketitle
 
 \begin{abstract}
-Evaluating visual reinforcement learning (Visual RL) algorithms remains difficult due to unstandardized tracking metrics, sample inefficiency, fragile visual generalization, and unreconciled baseline variance. Existing benchmarks bundle complex physics with visual perception, hiding specific causes of failure.
+Evaluating visual reinforcement learning (Visual RL) algorithms remains difficult due to unstandardized tracking metrics, sample inefficiency, and fragile visual generalization. Existing benchmarks bundle complex physics with visual perception, hiding specific causes of failure.
 
-We propose a standardized, lightweight visual pursuit benchmark suite operating above 300 FPS per CPU core. Our suite includes four continuous control environments: \texttt{SingleObjectTracking-v0}, \texttt{MultiObjectTracking-v0}, \texttt{ActiveTracking-v0}, and \texttt{MultiStageNavigation-v0}. We integrate Hungarian bipartite matching to evaluate Multi-Object Tracking Accuracy (MOTA), establish canonical Train / Validation / Test dataset partitions, and derive action-norm Grad-CAM heatmaps for visual diagnostic analysis.
+We propose a standardized, lightweight visual pursuit benchmark suite operating above 300 FPS per CPU core. Our suite includes four continuous control environments: \texttt{SingleObjectTracking-v0}, \texttt{MultiObjectTracking-v0}, \texttt{ActiveTracking-v0}, and \texttt{MultiStageNavigation-v0}. We integrate Hungarian bipartite matching to evaluate Multi-Object Tracking Accuracy (MOTA) and derive action-norm Grad-CAM heatmaps for visual diagnostic analysis.
 
-We evaluate policy robustness across 16 continuous shift severities under 5 random seeds ($[0, 42, 100, 123, 999]$). Results show that Euclidean feature embedding distance $d_{\text{Euc}}$ strongly predicts tracking error degradation (Pearson $r = -0.8345, p < 0.0001$; Spearman $\rho = -0.7812, p < 0.001$). Euclidean distance significantly outperforms Cosine distance ($r = -0.6380$) and Multi-Kernel RBF Maximum Mean Discrepancy ($r = -0.2840$). Across 6 benchmarked algorithmic paradigms with 95\% Confidence Intervals ($\pm \text{CI}_{95}$), Soft Actor-Critic (SAC) and tuned PPO achieve top tracking performance ($22.45 \pm 2.18$ px CLE and $28.34 \pm 2.45$ px CLE, $p < 0.001$), resolving earlier single-seed pilot baseline ambiguities. Furthermore, scaling navigation diagnostics to 1,000,000 steps brings policies to a competence threshold, exposing severe shaped reward proxy exploitation ($168.4 \pm 7.2$ hover steps). Deep residual vision backbones achieve a $12.1\times$ success rate improvement ($14.50\%$ vs $1.20\%$) over scratch convolutional networks ($p = 0.000042$).
+We evaluate policy robustness across 16 continuous shift severities. Results show that Euclidean feature embedding distance $d_{\text{Euc}}$ strongly predicts tracking error degradation (Pearson $r = -0.8099, p < 0.001$; Spearman $\rho = -0.7441, p < 0.001$). Euclidean distance significantly outperforms Cosine distance ($r = -0.6225$) and Maximum Mean Discrepancy ($r = -0.2618$). Across 6 benchmarked algorithmic baselines with 95\% Confidence Intervals ($\pm \text{CI}_{95}$), Soft Actor-Critic (SAC) achieves superior continuous tracking performance ($25.85 \pm 3.90$ px CLE, $p = 0.000053$). Bypassing scratch CNN feature learning via Deep Residual Backbones yields an $11.2\times$ success rate improvement ($2.47\%$ vs $0.22\%$).
 
-These findings show that early performance bottlenecks in visual RL stem from visual representation learning rather than policy exploration. Our benchmark suite, offline datasets, and statistical code are open source.
+These findings show that early performance bottlenecks in visual RL stem from representation learning rather than policy exploration. Our benchmark suite, offline datasets, and statistical code are open source.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Visual Reinforcement Learning, Continuous Pursuit, Hungarian MOTA, Representation Distance, Sim-to-Real Generalization, Pearson Correlation, 95\% Confidence Intervals, Reward Hacking Competence.
+Visual Reinforcement Learning, Continuous Pursuit, Hungarian MOTA, Representation Distance, Sim-to-Real Generalization, Pearson Correlation, Grad-CAM Saliency.
 \end{IEEEkeywords}
 
 \section{Introduction}
@@ -46,32 +46,21 @@ Reinforcement learning from raw visual observations allows agents to learn contr
 
 Existing visual RL benchmark suites such as DMControl, Procgen, and Atari present three main limitations. First, heavy rendering engines limit execution speed below 30 FPS per CPU core, slowing multi-seed training. Second, standard scalar reward signals fail to evaluate identity matching or target tracking errors. Third, black-box policy encoders lack native visual saliency tools to diagnose why policies fail under distribution shift.
 
-We ask: Can feature representation distance statistically predict out-of-distribution tracking performance degradation in continuous visual RL across seeds and environment shifts?
+We ask: Can feature representation distance statistically predict out-of-distribution tracking performance degradation in continuous visual RL?
 
-We propose a continuous visual pursuit benchmark suite operating above 300 FPS per CPU core. Our framework combines Hungarian bipartite matching metrics, continuous representation distance measurement, action-norm Grad-CAM saliency heatmaps, 1M-step reward-hacking competence diagnostics, and pre-aligned vision backbones.
+We propose a continuous visual pursuit benchmark suite operating above 300 FPS per CPU core. Our framework combines Hungarian bipartite matching metrics, continuous representation distance measurement, action-norm Grad-CAM saliency heatmaps, and pre-aligned vision backbones.
 
 We summarize our primary contributions as follows:
 \begin{itemize}
     \item \textbf{C1:} We introduce four lightweight continuous 2D visual pursuit environments isolating spatial tracking, ego-motion viewports, and multi-stage navigation.
-    \item \textbf{C2:} We establish canonical Train / Validation / Test dataset partitions for out-of-distribution visual shift evaluation.
-    \item \textbf{C3:} We benchmark 6 representative algorithmic paradigms across 5 random seeds with 95\% Confidence Intervals via a single unified evaluation pipeline, demonstrating SAC ($22.45$ px CLE) and tuned PPO ($28.34$ px CLE) reliably outperforming random baselines ($p < 0.001$).
-    \item \textbf{C4:} We scale navigation diagnostics to $1,000,000$ steps to reach policy competence, demonstrating active reward hacking under shaped rewards ($168.4$ hover exploit steps) versus true completion under sparse rewards ($88.0\%$ success).
-    \item \textbf{C5:} We prove across 16 continuous shift severities that Euclidean feature centroid distance $d_{\text{Euc}}$ strongly predicts tracking degradation ($r = -0.8345, p < 0.0001$).
-    \item \textbf{C6:} We derive action-norm Grad-CAM visual attention heatmaps, showing that dynamic distractors cause performance failure by hijacking visual attention.
+    \item \textbf{C2:} We integrate Hungarian bipartite matching to compute Multi-Object Tracking Accuracy (MOTA) independently of arbitrary target indexing.
+    \item \textbf{C3:} We empirically prove across 16 continuous shift severities that Euclidean feature centroid distance $d_{\text{Euc}}$ strongly predicts tracking degradation ($r = -0.8099, p < 0.001$).
+    \item \textbf{C4:} We derive action-norm Grad-CAM visual attention heatmaps, showing that dynamic distractors cause performance failure by hijacking visual attention.
 \end{itemize}
 
-\section{Benchmark Partitioning and Protocol}
+\section{Algorithmic Baselines \& 95\% Confidence Intervals}
 
-To ensure benchmark-level reproducibility, we establish canonical dataset partitions:
-\begin{itemize}
-    \item \textbf{Train Partition:} Clean canvas ($84 \times 84$), target speeds $1.0 - 3.0$ px/step, unperturbed background.
-    \item \textbf{Validation Partition:} Mild visual perturbations ($\sigma \le 0.10$ Gaussian noise, $N=1$ distractor, $\theta = 10^\circ$ viewpoint angle) for hyperparameter tuning.
-    \item \textbf{Test Partition (OOD Shift Spectrum):} 10 severe continuous visual shifts ($\sigma \in [0.15, 0.40]$, $N \in [2, 4]$ distractors, $\theta \in [20^\circ, 45^\circ]$ viewpoints).
-\end{itemize}
-
-\section{Algorithmic Baselines & 95\% Confidence Intervals}
-
-We evaluated 6 representative algorithms across 5 distinct random seeds ($[0, 42, 100, 123, 999]$) on \texttt{SingleObjectTracking-v0} using our unified canonical evaluation pipeline.
+We evaluated 6 representative algorithms across 5 distinct random seeds ($[0, 42, 100, 123, 999]$) on \texttt{SingleObjectTracking-v0}.
 
 \begin{table*}[t]
 \centering
@@ -81,49 +70,31 @@ We evaluated 6 representative algorithms across 5 distinct random seeds ($[0, 42
 \toprule
 \textbf{Policy Algorithm} & \textbf{Paradigm} & \textbf{Seeds} & \textbf{Success Rate (\%)} & \textbf{Mean CLE (pixels)} & \textbf{Welch $t$-test ($p$-value vs Random)} & \textbf{Statistically Significant} \\
 \midrule
-\textbf{Random Policy} & Random & 5 & $4.15 \pm 1.22\%$ & $40.82 \pm 3.14$ & --- & Baseline \\
-\textbf{PPO (CNN Policy, Tuned)} & On-Policy & 5 & $11.45 \pm 2.80\%$ & $28.34 \pm 2.45$ & $p = 0.000182$ & Yes ($p < 0.001$) \\
-\textbf{SAC (CNN Policy)} & Off-Policy & 5 & \textbf{$14.82 \pm 3.15\%$} & \textbf{$22.45 \pm 2.18$} & \textbf{$p = 0.000012$} & \textbf{Top Performer ($p < 0.0001$)} \\
-\textbf{TD3 (CNN Policy)} & Off-Policy & 5 & $8.90 \pm 2.10\%$ & $31.12 \pm 2.85$ & $p = 0.000845$ & Yes ($p < 0.001$) \\
-\textbf{Behavior Cloning (BC)} & Offline & 5 & $3.90 \pm 1.15\%$ & $41.95 \pm 3.80$ & $p = 0.582410$ & Baseline Comparable \\
-\textbf{DrQ-v2 Proxy (Aug PPO)} & Augmentation & 5 & $12.60 \pm 2.40\%$ & $26.10 \pm 2.25$ & $p = 0.000095$ & Yes ($p < 0.001$) \\
+\textbf{Random Policy} & Random & 5 & $4.28 \pm 1.29\%$ & $40.65 \pm 3.50$ & --- & Baseline \\
+\textbf{PPO (CNN Policy)} & On-Policy & 5 & $1.40 \pm 1.03\%$ & $56.68 \pm 6.34$ & $p = 0.000736$ & Yes ($p < 0.01$, Underperforms) \\
+\textbf{SAC (CNN Policy)} & Off-Policy & 5 & \textbf{$9.38 \pm 2.95\%$} & \textbf{$25.85 \pm 3.90$} & \textbf{$p = 0.000053$} & \textbf{Top Performer ($p < 0.0001$)} \\
+\textbf{TD3 (CNN Policy)} & Off-Policy & 5 & $0.46 \pm 0.24\%$ & $59.27 \pm 2.32$ & $p = 0.000006$ & Yes ($p < 0.01$) \\
+\textbf{Behavior Cloning (BC)} & Offline & 5 & $3.90 \pm 1.26\%$ & $42.26 \pm 4.53$ & $p = 0.457729$ & Baseline Comparable \\
+\textbf{DrQ-v2 Proxy (Aug PPO)} & Augmentation & 5 & $1.11 \pm 0.40\%$ & $55.76 \pm 3.87$ & $p = 0.000044$ & Yes ($p < 0.01$) \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
-\section{Reward-Hacking Competence Diagnostics}
-
-To eliminate underfitting, we trained policies on \texttt{MultiStageNavigation-v0} for $1,000,000$ steps (or pretrained ResNet-18 visual encoder) to reach a policy competence threshold ($>80\%$ key pickup).
-
-\begin{table}[t]
-\centering
-\caption{Reward-Hacking Diagnostic Suite at 1,000,000 Timesteps (5 Seeds, $\pm \text{CI}_{95}$)}
-\label{tab:reward_hacking}
-\begin{tabular}{lcccc}
-\toprule
-\textbf{Reward Type} & \textbf{Return} & \textbf{Success (\%)} & \textbf{Hover Steps} & \textbf{Proxy Exploitation} \\
-\midrule
-\textbf{Sparse Reward} & $0.88 \pm 0.06$ & \textbf{$88.0 \pm 6.0\%$} & $4.2 \pm 1.5$ & True Completion \\
-\textbf{Hackable Shaped} & \textbf{$142.5 \pm 8.2$} & $12.0 \pm 4.0\%$ & \textbf{$168.4 \pm 7.2$} & **Active Hacking** \\
-\bottomrule
-\end{tabular}
-\end{table}
-
 \section{Representation Distance and Statistical Correlation}
 
-We evaluated 5-seed policy checkpoints across 16 continuous shift severities ($\sigma \in [0.0, 0.4]$, $N \in [0, 4]$, $\theta \in [0^\circ, 45^\circ]$).
+We evaluated trained PPO policies across 16 continuous shift severities ($\sigma \in [0.0, 0.4]$, $N \in [0, 4]$, $\theta \in [0^\circ, 45^\circ]$).
 
 \begin{table*}[t]
 \centering
-\caption{Statistical Correlation Analysis of Feature Distance Metrics vs CLE Degradation (5 Seeds)}
+\caption{Statistical Correlation Analysis of Feature Distance Metrics vs CLE Degradation}
 \label{tab:correlation}
 \begin{tabular}{lcccccc}
 \toprule
 \textbf{Representation Metric} & \textbf{Formula / Kernel Definition} & \textbf{Pearson $r$} & \textbf{Pearson $p$-value} & \textbf{Spearman $\rho$} & \textbf{Spearman $p$-value} & \textbf{Rank} \\
 \midrule
-\textbf{Euclidean Distance ($d_{\text{Euc}}$)} & $\|\bar{f}_{\text{clean}} - \bar{f}_{\text{shift}}\|_2$ & \textbf{$-0.8345$} & \textbf{$p = 0.000042$} & \textbf{$-0.7812$} & \textbf{$p = 0.000210$} & \textbf{Rank 1} \\
-\textbf{Cosine Distance ($d_{\text{Cos}}$)} & $1 - \frac{\bar{f}_1 \cdot \bar{f}_2}{\|\bar{f}_1\| \|\bar{f}_2\|}$ & $-0.6380$ & $p = 0.007800$ & $-0.6120$ & $p = 0.011800$ & Rank 2 \\
-\textbf{Multi-Kernel RBF MMD ($d_{\text{MMD}}$)} & $\text{MMD}^2(X, Y)$ & $-0.2840$ & $p = 0.286000$ & $-0.3150$ & $p = 0.234000$ & Rank 3 \\
+\textbf{Euclidean Distance ($d_{\text{Euc}}$)} & $\|\bar{f}_{\text{clean}} - \bar{f}_{\text{shift}}\|_2$ & \textbf{$-0.8099$} & \textbf{$p = 0.00014$} & \textbf{$-0.7441$} & \textbf{$p = 0.00095$} & \textbf{Rank 1} \\
+\textbf{Cosine Distance ($d_{\text{Cos}}$)} & $1 - \frac{\bar{f}_1 \cdot \bar{f}_2}{\|\bar{f}_1\| \|\bar{f}_2\|}$ & $-0.6225$ & $p = 0.01001$ & $-0.5971$ & $p = 0.01461$ & Rank 2 \\
+\textbf{RBF Kernel MMD ($d_{\text{MMD}}$)} & $\text{MMD}^2(X, Y)$ & $-0.2618$ & $p = 0.32732$ & $-0.3088$ & $p = 0.24450$ & Rank 3 \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -132,38 +103,21 @@ We evaluated 5-seed policy checkpoints across 16 continuous shift severities ($\
 
 \begin{table}[t]
 \centering
-\caption{Visual Representation Backbone Comparison (5 Seeds, $\pm \text{CI}_{95}$)}
+\caption{Visual Representation Backbone Comparison (3 Seeds, $\pm \text{CI}_{95}$)}
 \label{tab:backbone}
 \begin{tabular}{lccc}
 \toprule
 \textbf{Backbone Architecture} & \textbf{Seeds} & \textbf{Success (\%)} & \textbf{Mean CLE (px)} \\
 \midrule
-\textbf{Scratch NatureCNN} & 5 & $1.20 \pm 0.45\%$ & $58.40 \pm 2.10$ px \\
-\textbf{Deep Residual Backbone} & 5 & \textbf{$14.50 \pm 2.80\%$} & \textbf{$24.80 \pm 2.35$ px} \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\section{Hardware and Compute Audit}
-
-\begin{table}[t]
-\centering
-\caption{Hardware Transparency and Model Audit}
-\label{tab:hardware}
-\begin{tabular}{lcccc}
-\toprule
-\textbf{Algorithm} & \textbf{Params} & \textbf{Latency (ms)} & \textbf{FPS} & \textbf{Size (MB)} \\
-\midrule
-\textbf{PPO (NatureCNN)} & 1,683,621 & $3.12 \pm 0.85$ & 320.5 & \textbf{6.42 MB} \\
-\textbf{SAC (NatureCNN)} & 6,035,944 & $3.25 \pm 0.90$ & 307.7 & 23.03 MB \\
-\textbf{ResNet-18 Backbone} & 11,176,512 & $4.85 \pm 1.10$ & 206.2 & 44.70 MB \\
+\textbf{Scratch NatureCNN} & 3 & $0.22 \pm 0.10\%$ & $61.35 \pm 1.47$ px \\
+\textbf{Deep Residual Backbone} & 3 & \textbf{$2.47 \pm 0.93\%$} & \textbf{$47.04 \pm 5.53$ px} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \section{Conclusion}
 
-We introduced a standardized, high-speed continuous visual pursuit benchmark suite for visual RL. We established Hungarian MOTA tracking metrics, canonical train/val/test dataset partitions, unified evaluation pipelines with 95\% CIs, and 1M-step reward-hacking competence diagnostics. We empirically validated representation distance bounds across 16 continuous shift severities, proving that Euclidean feature distance $d_{\text{Euc}}$ strongly predicts tracking degradation ($r = -0.8345, p < 0.0001$). Finally, we demonstrated a $12.1\times$ performance improvement when using deep residual vision backbones.
+We introduced a standardized continuous visual pursuit benchmark suite for visual RL. We established Hungarian MOTA tracking metrics, action-norm Grad-CAM saliency heatmaps, and 5-seed baseline evaluations. We empirically validated representation distance bounds across 16 continuous shift severities ($r = -0.8099, p < 0.001$). Finally, we demonstrated an $11.2\times$ performance improvement when using deep residual vision backbones.
 
 \begin{thebibliography}{99}
 
@@ -175,21 +129,6 @@ G.~Ma \emph{et~al.}, ``A comprehensive survey of data augmentation in visual rei
 
 \bibitem{wu2025reinforcement}
 W.~Wu \emph{et~al.}, ``Reinforcement learning in vision: A survey,'' \emph{arXiv preprint arXiv:2508.08189}, 2025.
-
-\bibitem{shen2025vlm}
-H.~Shen \emph{et~al.}, ``VLM-R1: A stable and generalizable R1-style large vision-language model,'' \emph{arXiv preprint arXiv:2504.07615}, 2025.
-
-\bibitem{guo2025improving}
-Y.~Guo \emph{et~al.}, ``Improving vision-language-action model with online reinforcement learning (iRe-VLA),'' in \emph{Proc. IEEE Int. Conf. Robot. Autom. (ICRA)}, 2025, pp. 15665--15672.
-
-\bibitem{lu2023vd4rl}
-C.~Lu \emph{et~al.}, ``Challenges and opportunities in offline reinforcement learning from visual observations (V-D4RL),'' \emph{Trans. Mach. Learn. Res.}, 2023.
-
-\bibitem{bernardin2008evaluating}
-K.~Bernardin and R.~Stiefelhagen, ``Evaluating multiple object tracking performance: the CLEAR MOT metrics,'' \emph{EURASIP J. Image Video Process.}, vol. 2008, pp. 1--10, 2008.
-
-\bibitem{barrientos2024use}
-D.~J. Barrientos~Rojas \emph{et~al.}, ``The use of reinforcement learning algorithms in object tracking,'' \emph{Neurocomputing}, vol. 596, p. 127954, 2024.
 
 \bibitem{fu2020d4rl}
 J.~Fu \emph{et~al.}, ``D4RL: Datasets for deep data-driven reinforcement learning,'' \emph{arXiv preprint arXiv:2004.07219}, 2020.
