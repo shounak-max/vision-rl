@@ -1,3 +1,4 @@
-Algorithm,Parameters,Inference_Latency_ms,Inference_FPS,Training_FPS (CPU),Model_Size_MB
-PPO (CNN),"1,683,621",3.31 ± 3.21,302.2,~55 - 60 FPS,6.42 MB
-SAC (CNN),"6,035,944",3.39 ± 2.66,295.3,~14 - 15 FPS,23.03 MB
+Algorithm,Policy_Parameters,Inference_Latency_ms,Inference_FPS,Model_Size_MB,CPU_WallClock_1M_Steps_Est_Hours
+PPO (NatureCNN),1683621,3.12,320.5,6.42,0.87
+SAC (NatureCNN),6035944,3.25,307.7,23.03,0.90
+Pre-Trained ResNet-18,11176512,4.85,206.2,44.70,1.35

@@ -1,70 +1,97 @@
+import os
+import sys
 import time
+import platform
+import psutil
 import torch
 import numpy as np
 import pandas as pd
-from stable_baselines3 import PPO, SAC
 import gymnasium as gym
-import envs.tracking_envs
+from stable_baselines3 import PPO, SAC, TD3
 
-def audit_model_compute(env_id="SingleObjectTracking-v0"):
-    print(f"=== Running Compute Efficiency & Model Latency Audit for {env_id} ===")
-    env = gym.make(env_id)
+def run_hardware_compute_audit():
+    print("=== Running Comprehensive Hardware Transparency & Compute Audit ===")
+    os.makedirs("results/tables", exist_ok=True)
     
-    # 1. PPO Policy Model
-    ppo_model = PPO("CnnPolicy", env, verbose=0)
-    ppo_params = sum(p.numel() for p in ppo_model.policy.parameters() if p.requires_grad)
+    # 1. Hardware Environment Inventory
+    cpu_name = platform.processor() or "Multi-Core CPU"
+    logical_cores = psutil.cpu_count(logical=True)
+    physical_cores = psutil.cpu_count(logical=False)
+    ram_gb = round(psutil.virtual_memory().total / (1024**3), 2)
     
-    # Benchmark PPO Inference Latency
-    obs, _ = env.reset()
-    latencies_ppo = []
-    for _ in range(100):
-        t0 = time.perf_counter()
-        action, _ = ppo_model.predict(obs, deterministic=True)
-        t1 = time.perf_counter()
-        latencies_ppo.append((t1 - t0) * 1000.0) # ms
+    cuda_available = torch.cuda.is_available()
+    gpu_name = torch.cuda.get_device_name(0) if cuda_available else "N/A (CPU Execution)"
+    cuda_version = torch.version.cuda if cuda_available else "N/A"
+    
+    sys_info = {
+        "OS": platform.platform(),
+        "Python_Version": sys.version.split()[0],
+        "PyTorch_Version": torch.__version__,
+        "CPU_Architecture": cpu_name,
+        "Physical_CPU_Cores": physical_cores,
+        "Logical_CPU_Cores": logical_cores,
+        "System_RAM_GB": ram_gb,
+        "CUDA_Available": cuda_available,
+        "GPU_Model": gpu_name,
+        "CUDA_Version": cuda_version
+    }
+    
+    print("\n--- System Hardware Inventory ---")
+    for k, v in sys_info.items():
+        print(f"  {k}: {v}")
         
-    ppo_mean_lat = np.mean(latencies_ppo)
-    ppo_fps = 1000.0 / ppo_mean_lat
+    # 2. Benchmarking Algorithm Parameter Count, Footprint, and Latency
+    env = gym.make("SingleObjectTracking-v0")
+    dummy_obs = env.reset()[0]
     
-    # 2. SAC Policy Model
-    sac_model = SAC("CnnPolicy", env, verbose=0, buffer_size=10000)
-    sac_params = sum(p.numel() for p in sac_model.policy.parameters() if p.requires_grad)
+    models = {
+        "PPO (NatureCNN)": PPO("CnnPolicy", env, verbose=0, n_steps=256),
+        "SAC (NatureCNN)": SAC("CnnPolicy", env, verbose=0, buffer_size=1000),
+    }
     
-    latencies_sac = []
-    for _ in range(100):
-        t0 = time.perf_counter()
-        action, _ = sac_model.predict(obs, deterministic=True)
-        t1 = time.perf_counter()
-        latencies_sac.append((t1 - t0) * 1000.0)
+    audit_data = []
+    
+    for name, model in models.items():
+        params = sum(p.numel() for p in model.policy.parameters() if p.requires_grad)
         
-    sac_mean_lat = np.mean(latencies_sac)
-    sac_fps = 1000.0 / sac_mean_lat
-    
-    audit_data = [
-        {
-            "Algorithm": "PPO (CNN)",
-            "Parameters": f"{ppo_params:,}",
-            "Inference_Latency_ms": f"{ppo_mean_lat:.2f} ± {np.std(latencies_ppo):.2f}",
-            "Inference_FPS": f"{ppo_fps:.1f}",
-            "Training_FPS (CPU)": "~55 - 60 FPS",
-            "Model_Size_MB": f"{(ppo_params * 4) / (1024*1024):.2f} MB"
-        },
-        {
-            "Algorithm": "SAC (CNN)",
-            "Parameters": f"{sac_params:,}",
-            "Inference_Latency_ms": f"{sac_mean_lat:.2f} ± {np.std(latencies_sac):.2f}",
-            "Inference_FPS": f"{sac_fps:.1f}",
-            "Training_FPS (CPU)": "~14 - 15 FPS",
-            "Model_Size_MB": f"{(sac_params * 4) / (1024*1024):.2f} MB"
-        }
-    ]
-    
-    df = pd.DataFrame(audit_data)
-    df.to_csv("results/compute_efficiency_audit.csv", index=False)
-    print("\n================ COMPUTE AUDIT RESULTS ================")
-    print(df.to_string(index=False))
-    print("=======================================================")
+        # Measure inference latency over 500 steps
+        start_time = time.time()
+        for _ in range(500):
+            _ = model.predict(dummy_obs, deterministic=True)
+        end_time = time.time()
+        
+        total_time_ms = (end_time - start_time) * 1000.0
+        latency_ms = total_time_ms / 500.0
+        fps = 500.0 / (end_time - start_time)
+        
+        # Save temp checkpoint to measure file footprint MB
+        tmp_path = f"results/tables/tmp_{name.replace(' ', '_')}.zip"
+        model.save(tmp_path)
+        size_mb = round(os.path.getsize(tmp_path) / (1024 * 1024), 2)
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+            
+        audit_data.append({
+            "Algorithm": name,
+            "Policy_Parameters": params,
+            "Inference_Latency_ms": round(latency_ms, 2),
+            "Inference_FPS": round(fps, 1),
+            "Model_Size_MB": size_mb,
+            "CPU_WallClock_1M_Steps_Est_Hours": round((1000000 / (fps * 60)) / 60, 2)
+        })
+        
     env.close()
+    
+    df_audit = pd.DataFrame(audit_data)
+    df_audit.to_csv("results/tables/compute_efficiency_audit.csv", index=False)
+    
+    with open("results/tables/hardware_inventory.json", "w") as f:
+        import json
+        json.dump(sys_info, f, indent=2)
+        
+    print("\n================ COMPUTE EFFICIENCY AUDIT ================")
+    print(df_audit.to_string(index=False))
+    print("==========================================================")
 
 if __name__ == "__main__":
-    audit_model_compute()
+    run_hardware_compute_audit()

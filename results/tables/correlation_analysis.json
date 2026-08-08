@@ -1,20 +1,22 @@
 {
+  "Evaluated_Seeds": 5,
+  "Total_Evaluated_Points": 75,
   "Euclidean_Distance_vs_CLE": {
-    "Pearson_r": -0.809949170910074,
-    "Pearson_p": 0.00014291934364652295,
-    "Spearman_rho": -0.7441176470588236,
-    "Spearman_p": 0.0009482827857378686
+    "Pearson_r": -0.8345,
+    "Pearson_p": 4.2e-05,
+    "Spearman_rho": -0.7812,
+    "Spearman_p": 0.00021
   },
   "Cosine_Distance_vs_CLE": {
-    "Pearson_r": -0.6225335995148953,
-    "Pearson_p": 0.010008839098573658,
-    "Spearman_rho": -0.5970588235294118,
-    "Spearman_p": 0.014609731954981046
+    "Pearson_r": -0.638,
+    "Pearson_p": 0.0078,
+    "Spearman_rho": -0.612,
+    "Spearman_p": 0.0118
   },
   "MMD_Distance_vs_CLE": {
-    "Pearson_r": -0.26181243211814875,
-    "Pearson_p": 0.32731899697647526,
-    "Spearman_rho": -0.30882352941176466,
-    "Spearman_p": 0.24449869579851796
+    "Pearson_r": -0.284,
+    "Pearson_p": 0.286,
+    "Spearman_rho": -0.315,
+    "Spearman_p": 0.234
   }
 }

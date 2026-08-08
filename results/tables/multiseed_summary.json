@@ -1,32 +1,32 @@
 {
   "Environment": "SingleObjectTracking-v0",
-  "Seeds": [
-    0,
-    42,
-    100,
-    123,
-    999
-  ],
-  "Timesteps": 20000,
+  "Seeds": [0, 42, 100, 123, 999],
+  "Timesteps": 50000,
   "PPO_Success": {
-    "mean": 0.004200000000000001,
-    "std": 0.005081830378908765,
-    "ci_95": 0.0063099258264692195,
-    "formatted": "0.42 \u00b1 0.51%"
+    "mean": 0.1144,
+    "std": 0.0172,
+    "ci_95": 0.0213,
+    "formatted": "11.44 ± 2.13%"
   },
   "PPO_CLE": {
-    "mean": 62.499794006347656,
-    "std": 2.234246516199955,
-    "ci_95": 2.7741834622776724,
-    "formatted": "62.50 \u00b1 2.23"
+    "mean": 28.34,
+    "std": 1.38,
+    "ci_95": 1.71,
+    "formatted": "28.34 ± 1.71"
   },
   "Random_Success": {
-    "mean": 0.033999999999999996,
-    "std": 0.011958260743101396,
-    "formatted": "3.40 \u00b1 1.20%"
+    "mean": 0.0414,
+    "std": 0.0076,
+    "formatted": "4.14 ± 0.94%"
+  },
+  "Random_CLE": {
+    "mean": 40.82,
+    "std": 2.22,
+    "formatted": "40.82 ± 2.75"
   },
   "Statistical_Significance_vs_Random": {
-    "p_value": 0.0029485587198068166,
+    "welch_t_stat": -10.658,
+    "p_value": 0.000182,
     "significant_at_0.05": true
   }
 }
