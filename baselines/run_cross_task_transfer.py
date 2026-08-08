@@ -1,4 +1,11 @@
 import os
+import sys
+
+WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if WORKSPACE_DIR not in sys.path:
+    sys.path.insert(0, WORKSPACE_DIR)
+os.chdir(WORKSPACE_DIR)
+
 import argparse
 import numpy as np
 import pandas as pd
@@ -10,7 +17,7 @@ import envs.tracking_envs
 from utils.eval_pipeline import evaluate_policy_canonical, compute_stat_ci95
 from utils.stats import welch_ttest
 
-def run_transfer_experiment(source_env="SingleObjectTracking-v0", target_env="ActiveTracking-v0", steps=30000, seeds=[0, 42, 100, 123, 999]):
+def run_transfer_experiment(source_env="SingleObjectTracking-v0", target_env="ActiveTracking-v0", steps=10000, seeds=[0, 42, 100, 123, 999]):
     print(f"=== Cross-Task Transfer Benchmark ({len(seeds)} seeds): {source_env} -> {target_env} ===")
     os.makedirs("results/tables", exist_ok=True)
     os.makedirs("results/models", exist_ok=True)
@@ -73,7 +80,7 @@ def run_transfer_experiment(source_env="SingleObjectTracking-v0", target_env="Ac
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--steps", type=int, default=30000)
+    parser.add_argument("--steps", type=int, default=10000)
     args = parser.parse_args()
     
     run_transfer_experiment(steps=args.steps)

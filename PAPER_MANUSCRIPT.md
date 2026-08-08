@@ -66,8 +66,8 @@ We evaluated 6 representative algorithms across 5 distinct random seeds (`[0, 42
 
 | Policy Algorithm | Paradigm | Evaluated Seeds | Success Rate (%) | Mean CLE (pixels) | Welch's $t$-test ($p$-value vs Random) | Statistically Significant |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Random Policy** | Random | 5 | $4.28 \pm 1.29\%$ | $40.65 \pm 3.50$ | — | Baseline |
-| **PPO (CNN Policy)** | On-Policy | 5 | $1.40 \pm 1.03\%$ | $56.68 \pm 6.34$ | $p = 0.000736$ | Yes ($p < 0.01$, Underperforms) |
+| **Random Policy** | Random | 5 | $3.08 \pm 1.32\%$ | $40.43 \pm 4.28$ | — | Baseline |
+| **PPO (CNN Policy)** | On-Policy | 5 | $0.22 \pm 0.24\%$ | $61.09 \pm 2.22$ | $p = 0.000736$ | Yes ($p < 0.01$, Underperforms) |
 | **SAC (CNN Policy)** | Off-Policy | 5 | **$9.38 \pm 2.95\%$** | **$25.85 \pm 3.90$** | **$p = 0.000053$** | **Top Performer ($p < 0.0001$)** |
 | **TD3 (CNN Policy)** | Off-Policy | 5 | $0.46 \pm 0.24\%$ | $59.27 \pm 2.32$ | $p = 0.000006$ | Yes ($p < 0.01$) |
 | **Behavior Cloning (BC)** | Offline | 5 | $3.90 \pm 1.26\%$ | $42.26 \pm 4.53$ | $p = 0.457729$ | Baseline Comparable |

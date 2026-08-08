@@ -1,4 +1,12 @@
 import os
+import sys
+
+# Ensure workspace root is in sys.path
+WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if WORKSPACE_DIR not in sys.path:
+    sys.path.insert(0, WORKSPACE_DIR)
+os.chdir(WORKSPACE_DIR)
+
 import numpy as np
 import pandas as pd
 import torch
@@ -26,12 +34,11 @@ def run_fast_suite():
     transfer_results = []
     
     for seed in seeds:
-        src_model_path = f"results/models/PPO_SingleObjectTracking-v0_s{seed}.zip"
-        if os.path.exists(src_model_path):
-            model_src = PPO.load(src_model_path)
+        src_path = f"results/models/PPO_SingleObjectTracking-v0_s{seed}.zip"
+        if os.path.exists(src_path):
+            model_src = PPO.load(src_path)
             metrics_jumpstart = evaluate_policy_canonical(model_src, "ActiveTracking-v0", n_episodes=20, seed=seed)
             
-            # Fine-tune model for 10k steps
             env_tgt = gym.make("ActiveTracking-v0")
             model_src.set_env(env_tgt)
             model_src.learn(total_timesteps=10000)
@@ -49,15 +56,23 @@ def run_fast_suite():
                 "FineTuned_Success": metrics_finetuned['success_rate']
             })
         else:
-            # Evaluate random/default as baseline
-            m_scratch = evaluate_policy_canonical(None, "ActiveTracking-v0", n_episodes=20, seed=seed)
+            # Evaluate real random and scratch policies directly without synthetic multipliers
+            env_tgt = gym.make("ActiveTracking-v0")
+            model_fresh = PPO("CnnPolicy", env_tgt, verbose=0, seed=seed)
+            metrics_jumpstart = evaluate_policy_canonical(model_fresh, "ActiveTracking-v0", n_episodes=20, seed=seed)
+            model_fresh.learn(total_timesteps=10000)
+            metrics_finetuned = evaluate_policy_canonical(model_fresh, "ActiveTracking-v0", n_episodes=20, seed=seed)
+            env_tgt.close()
+            
+            metrics_scratch = evaluate_policy_canonical(None, "ActiveTracking-v0", n_episodes=20, seed=seed)
+            
             transfer_results.append({
                 "Seed": seed,
-                "Scratch_Target_CLE": m_scratch['mean_cle'],
-                "ZeroShot_Jumpstart_CLE": m_scratch['mean_cle'] * 1.1,
-                "FineTuned_Target_CLE": m_scratch['mean_cle'] * 0.65,
-                "Scratch_Success": m_scratch['success_rate'],
-                "FineTuned_Success": m_scratch['success_rate'] * 3.5
+                "Scratch_Target_CLE": metrics_scratch['mean_cle'],
+                "ZeroShot_Jumpstart_CLE": metrics_jumpstart['mean_cle'],
+                "FineTuned_Target_CLE": metrics_finetuned['mean_cle'],
+                "Scratch_Success": metrics_scratch['success_rate'],
+                "FineTuned_Success": metrics_finetuned['success_rate']
             })
             
     df_transfer = pd.DataFrame(transfer_results)
@@ -68,8 +83,8 @@ def run_fast_suite():
     
     print("\n================ CANONICAL CROSS-TASK TRANSFER SUMMARY ================")
     print(f"Scratch Policy CLE:   {stat_scratch_cle['formatted']} px")
-    print(f"Fine-Tuned Target CLE: {stat_finetuned_cle['formatted']} px")
-    print("=======================================================================")
+    print(f"Fine-Tuned Policy CLE: {stat_finetuned_cle['formatted']} px")
+    print("=======================================================================\n")
 
 if __name__ == "__main__":
     run_fast_suite()
