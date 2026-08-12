@@ -1,7 +1,0 @@
-Architecture,Seed,Success_Rate,Mean_CLE,Delta_CLE_Reduction
-Scratch CNN (3-Layer),0,0.001,61.01224,-0.49210906
-Scratch CNN (3-Layer),42,0.0025,60.08479,-0.46942735
-Scratch CNN (3-Layer),100,0.003,62.95086,-0.53951967
-Pre-Trained ResNet-18 (Frozen Backbone),0,0.034,40.89198,-4.9948692e-05
-Pre-Trained ResNet-18 (Frozen Backbone),42,0.0155,48.702267,-0.19105756
-Pre-Trained ResNet-18 (Frozen Backbone),100,0.0245,51.526844,-0.26013517
