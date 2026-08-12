@@ -1,3 +1,0 @@
-Algorithm,Policy_Parameters,Inference_Latency_ms,Inference_FPS,Model_Size_MB,CPU_WallClock_1M_Steps_Est_Hours
-PPO (NatureCNN),1683621,1.54,650.2,6.55,0.43
-SAC (NatureCNN),6035944,1.54,649.0,23.17,0.43

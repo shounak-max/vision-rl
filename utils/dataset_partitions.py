@@ -6,7 +6,7 @@ from envs.wrappers import NoiseWrapper, DistractorWrapper, ViewpointWrapper
 BENCHMARK_PARTITIONS = {
     "train": {
         "description": "Standard clean background canvas (84x84) with unperturbed dynamics.",
-        "environments": ["SingleObjectTracking-v0", "MultiObjectTracking-v0", "ActiveTracking-v0", "MultiStageNavigation-v0"],
+        "environments": ["procgen:procgen-coinrun-v0", "MultiStageNavigation-v0"],
         "wrappers": []
     },
     "validation": {

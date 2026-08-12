@@ -1,3 +1,0 @@
-Configuration,OOD_Success_Rate_Mean,OOD_Success_Rate_CI95,OOD_Mean_CLE_Mean,OOD_Mean_CLE_CI95,Formatted_Success,Formatted_CLE
-Full Model (with DataAug),0.045,0.012,52.4,2.1,"4.50 ± 1.20%","52.40 ± 2.10"
-No Data Augmentation,0.008,0.0035,63.8,2.8,"0.80 ± 0.35%","63.80 ± 2.80"

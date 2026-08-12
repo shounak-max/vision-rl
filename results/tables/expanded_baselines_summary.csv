@@ -1,7 +1,0 @@
-Algorithm,Evaluated_Seeds,Success_Rate_Mean,Success_Rate_CI95,Mean_CLE_Mean,Mean_CLE_CI95,Welch_p_value,Formatted_CLE,Formatted_Success
-Random Policy,5,0.0308,0.0132,40.43,4.28,1.0,"40.43 ± 4.28","3.08 ± 1.32%"
-PPO (NatureCNN),5,0.0022,0.0024,61.09,2.22,0.000736,"61.09 ± 2.22","0.22 ± 0.24%"
-SAC (NatureCNN),5,0.0938,0.0295,25.85,3.90,0.000053,"25.85 ± 3.90","9.38 ± 2.95%"
-TD3 (NatureCNN),5,0.0046,0.0024,59.27,2.32,0.000006,"59.27 ± 2.32","0.46 ± 0.24%"
-Behavior Cloning (BC),5,0.0390,0.0126,42.26,4.53,0.457729,"42.26 ± 4.53","3.90 ± 1.26%"
-DrQ-v2 Proxy (Aug PPO),5,0.0111,0.0040,55.76,3.87,0.000044,"55.76 ± 3.87","1.11 ± 0.40%"

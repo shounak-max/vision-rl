@@ -115,8 +115,54 @@ class SparseRewardStepWrapper(gym.Wrapper):
         info['sparse_reward'] = reward
         return obs, reward, terminated, truncated, info
 
+class RandomShiftWrapper(gym.ObservationWrapper):
+    """Applies Random Shift augmentation."""
+    def __init__(self, env, max_shift=4):
+        super().__init__(env)
+        self.max_shift = max_shift
+
+    def observation(self, obs):
+        obs_cv = np.transpose(obs, (1, 2, 0)).astype(np.float32)
+        h, w = obs_cv.shape[:2]
+        shift_x = np.random.randint(-self.max_shift, self.max_shift + 1)
+        shift_y = np.random.randint(-self.max_shift, self.max_shift + 1)
+        M = np.float32([[1, 0, shift_x], [0, 1, shift_y]])
+        obs_cv = cv2.warpAffine(obs_cv, M, (w, h), borderMode=cv2.BORDER_REPLICATE)
+        return np.transpose(obs_cv, (2, 0, 1))
+
+class ColorJitterWrapper(gym.ObservationWrapper):
+    """Applies Color Jitter augmentation."""
+    def __init__(self, env, brightness=0.2, contrast=0.2):
+        super().__init__(env)
+        self.brightness = brightness
+        self.contrast = contrast
+
+    def observation(self, obs):
+        obs_cv = np.transpose(obs, (1, 2, 0)).astype(np.float32)
+        alpha = np.random.uniform(1.0 - self.contrast, 1.0 + self.contrast)
+        beta = np.random.uniform(-self.brightness, self.brightness) * 255
+        obs_cv = cv2.convertScaleAbs(obs_cv, alpha=alpha, beta=beta)
+        return np.transpose(obs_cv, (2, 0, 1))
+
+class CutoutWrapper(gym.ObservationWrapper):
+    """Applies Cutout augmentation."""
+    def __init__(self, env, cutout_ratio=0.15):
+        super().__init__(env)
+        self.cutout_ratio = cutout_ratio
+
+    def observation(self, obs):
+        obs_cv = np.transpose(obs, (1, 2, 0)).copy()
+        h, w = obs_cv.shape[:2]
+        patch_size = int(np.sqrt(self.cutout_ratio) * min(h, w))
+        patch_size = max(1, patch_size)
+        top = np.random.randint(0, max(1, h - patch_size + 1))
+        left = np.random.randint(0, max(1, w - patch_size + 1))
+        # Cutout typically fills with mean color or black (0)
+        obs_cv[top:top+patch_size, left:left+patch_size] = 0
+        return np.transpose(obs_cv, (2, 0, 1))
+
 class DataAugmentationWrapper(gym.ObservationWrapper):
-    """Applies principled data augmentations (Random Shift, Color Jitter) for robust visual RL (Ma et al., 2022/2025)."""
+    """Applies combined data augmentations (Random Shift + Color Jitter)."""
     def __init__(self, env, max_shift=4, jitter_brightness=0.2, jitter_contrast=0.2):
         super().__init__(env)
         self.max_shift = max_shift
@@ -124,7 +170,6 @@ class DataAugmentationWrapper(gym.ObservationWrapper):
         self.jitter_contrast = jitter_contrast
 
     def observation(self, obs):
-        # stable-baselines3 uses C, H, W. Convert to H, W, C for cv2.
         obs_cv = np.transpose(obs, (1, 2, 0)).astype(np.float32)
         h, w = obs_cv.shape[:2]
 
