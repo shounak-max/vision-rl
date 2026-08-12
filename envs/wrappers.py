@@ -140,3 +140,66 @@ class DataAugmentationWrapper(gym.ObservationWrapper):
         obs_cv = cv2.warpAffine(obs_cv, M, (w, h), borderMode=cv2.BORDER_REPLICATE)
 
         return np.transpose(obs_cv, (2, 0, 1))
+
+class OcclusionWrapper(gym.ObservationWrapper):
+    """Applies random rectangular spatial occlusion patches to observations."""
+    def __init__(self, env, occlusion_ratio=0.10):
+        super().__init__(env)
+        self.occlusion_ratio = float(occlusion_ratio)
+
+    def observation(self, obs):
+        obs_cv = np.transpose(obs, (1, 2, 0)).copy()
+        h, w = obs_cv.shape[:2]
+        patch_size = int(np.sqrt(self.occlusion_ratio) * min(h, w))
+        patch_size = max(1, patch_size)
+        
+        top = np.random.randint(0, max(1, h - patch_size + 1))
+        left = np.random.randint(0, max(1, w - patch_size + 1))
+        
+        obs_cv[top:top+patch_size, left:left+patch_size] = 0
+        return np.transpose(obs_cv, (2, 0, 1))
+
+class BlurWrapper(gym.ObservationWrapper):
+    """Applies spatial box blurring to observations."""
+    def __init__(self, env, kernel_size=5):
+        super().__init__(env)
+        k = int(kernel_size)
+        if k % 2 == 0:
+            k += 1
+        self.kernel_size = max(3, k)
+
+    def observation(self, obs):
+        obs_cv = np.transpose(obs, (1, 2, 0))
+        obs_blur = cv2.blur(obs_cv, (self.kernel_size, self.kernel_size))
+        return np.transpose(obs_blur, (2, 0, 1))
+
+class CompoundShiftWrapper(gym.ObservationWrapper):
+    """Applies combined multi-axis visual shifts (Noise + Distractors + Viewpoint Rotation)."""
+    def __init__(self, env, severity_level=1):
+        super().__init__(env)
+        self.severity_level = int(severity_level)
+        
+        # Severity tiers: Level 1 to 5
+        level_params = {
+            1: {"noise_std": 0.05, "num_distractors": 1, "max_angle": 5},
+            2: {"noise_std": 0.10, "num_distractors": 2, "max_angle": 10},
+            3: {"noise_std": 0.15, "num_distractors": 2, "max_angle": 15},
+            4: {"noise_std": 0.20, "num_distractors": 3, "max_angle": 20},
+            5: {"noise_std": 0.25, "num_distractors": 4, "max_angle": 25}
+        }
+        params = level_params.get(self.severity_level, level_params[1])
+        
+        # Wrap underlying env
+        wrapped_env = NoiseWrapper(env, noise_std=params["noise_std"])
+        wrapped_env = DistractorWrapper(wrapped_env, num_distractors=params["num_distractors"])
+        self.compound_env = ViewpointWrapper(wrapped_env, max_angle=params["max_angle"])
+
+    def reset(self, **kwargs):
+        return self.compound_env.reset(**kwargs)
+
+    def step(self, action):
+        return self.compound_env.step(action)
+
+    def observation(self, obs):
+        return self.compound_env.observation(obs)
+

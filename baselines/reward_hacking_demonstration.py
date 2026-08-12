@@ -1,3 +1,7 @@
+# TODO: VERIFICATION REQUIRED BEFORE RE-USE
+# Flagged during Step 1 Audit: The actual step count (500k vs 1M) and the source of the ">95%" key pickup rate claim
+# must be verified against a physical execution log file before these metrics are cited or used in any paper draft.
+
 import os
 import argparse
 import numpy as np
