@@ -32,19 +32,12 @@ vision-rl/
 │   ├── tracking_envs.py          # Single-Object, Multi-Object, and Active Tracking envs
 │   ├── navigation_envs.py        # MultiStageNavigation-v0 (long-horizon reward env)
 │   └── wrappers.py               # DataAugmentation, Noise, Distractor, Viewpoint wrappers
-├── baselines/                    # Training algorithms, diagnostic & ablation scripts
-│   ├── fast_eval_suite.py        # Unified canonical benchmark evaluation runner
-│   ├── train_expanded_baselines.py # 6-Algorithm benchmark suite runner (5 seeds, 95% CIs)
-│   ├── train_multiseed.py        # 5-Seed statistical significance evaluator
-│   ├── run_ablations.py          # Component ablation study runner
-│   ├── run_cross_task_transfer.py # Downstream cross-task transfer evaluator
-│   ├── evaluate_generalization.py # Evaluation under visual distribution shifts
-│   ├── evaluate_ood.py           # Corruption severity evaluation runner
-│   ├── pretrained_policy.py      # ResNet-18 / Residual vision backbone policies
-│   ├── run_pretrained_experiment.py # Scratch CNN vs Pre-trained backbone benchmark
-│   ├── reward_hacking_demonstration.py # 1M-step competence reward hacking diagnostic
-│   ├── generate_offline_data.py  # V-D4RL-lite offline dataset generator
-│   └── train_ire_vla_lite.py     # iRe-VLA alternating online RL + offline BC runner
+├── baselines/                    # Focused research scripts & remote GPU deployment
+│   ├── run_scale_experiment.py   # Multi-seed 10M-step Procgen + Navigation scale-up runner
+│   ├── predictive_augmentation_selection.py # Test-Time Augmentation (TTA) predictive selection proxy
+│   ├── smoke_procgen.py          # Procgen 300k-step smoke test & wrapper evaluation suite
+│   ├── deploy_remote_gpu.py      # SSH/SFTP cluster deployment & nohup launcher
+│   └── read_tb_logs.py           # TensorBoard event log parser
 ├── utils/                        # Metrics, statistics, latency audits & visualization
 │   ├── eval_pipeline.py          # Unified canonical evaluation & 95% CI pipeline
 │   ├── dataset_partitions.py     # Train / Validation / Test benchmark splits

@@ -70,13 +70,9 @@ def sync_code_to_remote():
     local_files = [
         "requirements.txt",
         "envs/__init__.py", "envs/tracking_envs.py", "envs/navigation_envs.py", "envs/wrappers.py",
-        "baselines/pretrained_policy.py", "baselines/train_multiseed.py", "baselines/reward_hacking_demonstration.py",
-        "baselines/representation_correlation.py", "baselines/evaluate_ood.py", "baselines/run_ablations.py",
-        "baselines/train_expanded_baselines.py", "baselines/run_cross_task_transfer.py", "baselines/run_pretrained_experiment.py",
-        "baselines/fast_eval_suite.py", "baselines/rmr_ppo.py", "baselines/run_rep_distance_experiment.py",
+        "baselines/predictive_augmentation_selection.py", "baselines/smoke_procgen.py", "baselines/run_scale_experiment.py",
         "utils/metrics.py", "utils/stats.py", "utils/saliency.py", "utils/visualization.py",
-        "utils/eval_pipeline.py", "utils/dataset_partitions.py", "utils/compute_audit.py",
-        "results/tables/rep_distance_manifest.json"
+        "utils/eval_pipeline.py", "utils/dataset_partitions.py", "utils/compute_audit.py"
     ]
     
     for rel_path in local_files:
@@ -92,20 +88,20 @@ def sync_code_to_remote():
     return True
 
 def launch_detached_remote_job():
-    """Launches the 8.0M-step experiment under nohup so it persists across SSH disconnects."""
+    """Launches the scale-up experiment under nohup so it persists across SSH disconnects."""
     if not sync_code_to_remote():
         print("Aborting launch due to sync error.")
         return
 
-    nohup_cmd = f"nohup bash -c 'source /home/piyush/miniconda3/bin/activate && conda activate rl_env && cd {REMOTE_DIR} && PYTHONPATH=. python3 baselines/run_rep_distance_experiment.py' > {REMOTE_DIR}/results/logs/experiment_stdout.log 2>&1 &"
+    nohup_cmd = f"nohup bash -c 'source /home/piyush/miniconda3/bin/activate && conda activate rl_env && cd {REMOTE_DIR} && PYTHONPATH=. python3 baselines/run_scale_experiment.py' > {REMOTE_DIR}/results/logs/experiment_stdout.log 2>&1 &"
     
-    print("\n=== Launching Detached (nohup) 8.0M-Step Experiment on Remote GPU Server ===")
+    print("\n=== Launching Detached (nohup) Scale Experiment on Remote GPU Server ===")
     out, err = execute_remote_cmd_safe(nohup_cmd)
     print("Detached Remote Execution Command Issued!")
     
     # Wait 3 seconds and verify remote PID is running
     time.sleep(3)
-    check_cmd = "ps aux | grep run_rep_distance_experiment | grep -v grep"
+    check_cmd = "ps aux | grep run_scale_experiment | grep -v grep"
     pid_out, _ = execute_remote_cmd_safe(check_cmd)
     if pid_out.strip():
         print(f"VERIFIED REMOTE PID RUNNING:\n{pid_out}")

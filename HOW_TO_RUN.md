@@ -37,90 +37,55 @@ pip install -r requirements.txt
 
 ---
 
-## 3. Quick Start: Execute All Benchmarks (One-Liner)
+## 3. Quick Start: Execute Core Research Experiments
 
-To run the complete canonical benchmark suite, statistical tests, and figure visualizers sequentially:
+To run the predictive augmentation proxy evaluation, Procgen smoke test, and scale-up experiments:
 
 ```bash
-python baselines/fast_eval_suite.py && \
-python baselines/run_pretrained_experiment.py --steps 30000 && \
-python baselines/run_cross_task_transfer.py --steps 30000 && \
-python baselines/run_ablations.py --steps 30000 && \
-python baselines/representation_correlation.py && \
-python baselines/reward_hacking_demonstration.py --steps 500000 && \
-python utils/saliency.py && \
-python utils/visualization.py && \
-python utils/compute_audit.py
+# 1. Test-Time Augmentation (TTA) Predictive Selection Proxy:
+python baselines/predictive_augmentation_selection.py
+
+# 2. Procgen Smoke Test (300k steps, 50 layout-randomized episodes/shift):
+python baselines/smoke_procgen.py
+
+# 3. Scale-Up Benchmark (Procgen + Navigation across 5 seeds x 10M timesteps):
+python baselines/run_scale_experiment.py
 ```
 
 ---
 
 ## 4. Detailed Module-by-Module Execution Guide
 
-### Step 1: Multi-Seed Baseline Benchmark Evaluation (5 Seeds, 95% CIs)
-Evaluates 6 algorithmic baselines (Random, PPO, SAC, TD3, BC, DrQ-v2) across 5 distinct random seeds (`[0, 42, 100, 123, 999]`), reporting 95% Student-$t$ CIs and Welch's $t$-test $p$-values.
+### Step 1: Predictive Augmentation Selection via TTA Proxy
+Evaluates representation distance ($d_{\text{Euc}}$) as a cheap proxy to rank 13 candidate data augmentation strategies across 10 visual distribution shifts.
 ```bash
-python baselines/train_expanded_baselines.py --steps 30000
+python baselines/predictive_augmentation_selection.py
 ```
-- **Outputs:** `results/tables/expanded_baselines_summary.csv` and `results/tables/expanded_baselines_results.csv`.
+- **Outputs:** `results/tables/predictive_selection.csv` and `results/tables/predictive_selection_summary.json`.
 
 ---
 
-### Step 2: Visual Representation Backbone Comparison
-Compares a 3-layer NatureCNN trained from scratch against a Deep Residual Vision Backbone (`PretrainedVisionFeatureExtractor`) across 5 seeds.
+### Step 2: Procgen Procedural Generalization Smoke Test
+Trains PPO on `procgen:procgen-coinrun-v0` and evaluates policy performance across 11 perturbation wrappers (Noise, Distractor, Viewpoint, Occlusion, Blur, Compound) using 50 layout-randomized seeds.
 ```bash
-python baselines/run_pretrained_experiment.py --steps 30000
+python baselines/smoke_procgen.py
 ```
-- **Outputs:** `results/tables/pretrained_vs_scratch_results.csv`.
+- **Outputs:** `results/tables/procgen_smoke_test_results.csv` and `results/tables/procgen_smoke_test_summary.json`.
 
 ---
 
-### Step 3: 16-Level Representation Distance Correlation Analysis
-Evaluates policy checkpoints across 16 continuous shift severities ($\sigma \in [0.0, 0.4]$, $N \in [0, 4]$, $\theta \in [0^\circ, 45^\circ]$) under the canonical Test partition. Computes **Pearson correlation ($r$)**, **Spearman rank correlation ($\rho$)**, Cosine distance, and Multi-Kernel RBF MMD distance across 5 seeds.
+### Step 3: Multi-Seed Scale-Up Experiment (Remote GPU / Cluster)
+Trains `PPO_Standard` and `DataAugmented_PPO` across 5 random seeds (`[0, 42, 100, 123, 999]`) and 10M timesteps on Procgen. Computes Pearson $r$ and Spearman $\rho$ correlation between representation distance and return degradation.
 ```bash
-python baselines/representation_correlation.py
+python baselines/run_scale_experiment.py
+# Or launch detached background job on remote GPU server:
+python baselines/deploy_remote_gpu.py
 ```
-- **Outputs:** `results/tables/representation_distance_comparison.csv` and `results/tables/correlation_analysis.json`.
+- **Outputs:** `results/tables/scale_experiment_results.csv` and `results/tables/correlation_procgen_procgen-coinrun-v0.json`.
 
 ---
 
-### Step 4: Active Reward Hacking Competence Diagnostic (1M Steps)
-Pairs the pre-trained residual backbone with `MultiStageNavigation-v0` up to $1,000,000$ steps to reach a policy competence threshold, demonstrating hovering proxy exploitation under shaped rewards versus true completion under sparse rewards.
-```bash
-python baselines/reward_hacking_demonstration.py --steps 500000
-```
-- **Outputs:** `results/tables/reward_hacking_demonstrated.csv`.
-
----
-
-### Step 5: Downstream Cross-Task Transfer Learning
-Evaluates feature transfer from `SingleObjectTracking-v0` to `ActiveTracking-v0` across 5 seeds.
-```bash
-python baselines/run_cross_task_transfer.py --steps 30000
-```
-- **Outputs:** `results/tables/cross_task_transfer_results.csv`.
-
----
-
-### Step 6: Component Ablation Study
-Evaluates policy robustness with vs. without `DataAugmentationWrapper` under out-of-distribution Gaussian noise across 5 seeds.
-```bash
-python baselines/run_ablations.py --steps 30000
-```
-- **Outputs:** `results/tables/ablation_results.csv`.
-
----
-
-### Step 7: Grad-CAM Visual Attention Heatmap Extraction
-Extracts gradient-weighted class activation heatmaps from policy CNNs to inspect visual attention focus under clean vs. distractor conditions.
-```bash
-python utils/saliency.py
-```
-- **Outputs:** `results/figures/gradcam_attention.png`.
-
----
-
-### Step 8: Hardware Transparency & Latency Audit
+### Step 4: Hardware Transparency & Latency Audit
 Audits model parameter count, memory footprint (MB), FPS during training/inference, and per-frame latency (ms).
 ```bash
 python utils/compute_audit.py
