@@ -66,6 +66,9 @@ vision-rl/
 
 ## 4. Ground-Truth Empirical Benchmark Data (Locked Reference)
 
+> [!WARNING]
+> This table is **STALE** and currently contradicts `CONTEXT.md`. It references files that no longer exist (e.g., `representation_correlation.py`) and reports numbers that have not been re-run since the recent repository pivot. **Do not treat any number in this table as real.**
+
 All manuscript text, tables, and AI agent outputs must strictly match these ground-truth numbers:
 
 | Experiment / Metric | Ground-Truth Empirical Value | Verification Source File |
@@ -86,18 +89,18 @@ All manuscript text, tables, and AI agent outputs must strictly match these grou
 
 ## 5. Execution Commands for AI Agents
 
-When executing or verifying code changes in this workspace, use PowerShell with explicit Python paths:
+When executing or verifying code changes in this workspace, use PowerShell and always activate the virtual environment first:
 
 ```powershell
 # 1. Run codebase regression suite
-C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -Command "& 'C:\Users\shoun\AppData\Local\Programs\Python\Python310\python.exe' 'C:\Users\shoun\.gemini\antigravity-ide\brain\bc8f95ff-59e6-4792-b3a0-7d0d5c6b1d27\scratch\verify_all.py'"
+C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -Command "cd 'd:\gitfork\vision rl'; .\venv\Scripts\Activate.ps1; python scratch\verify_all.py"
 
 # 2. Run utilities & visualization suite
-C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -Command "& 'C:\Users\shoun\AppData\Local\Programs\Python\Python310\python.exe' 'C:\Users\shoun\.gemini\antigravity-ide\brain\bc8f95ff-59e6-4792-b3a0-7d0d5c6b1d27\scratch\verify_utils.py'"
+C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -Command "cd 'd:\gitfork\vision rl'; .\venv\Scripts\Activate.ps1; python scratch\verify_utils.py"
 
-# 3. Execute 6-algorithm 5-seed benchmark runner
-C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -Command "& 'C:\Users\shoun\AppData\Local\Programs\Python\Python310\python.exe' 'd:\gitfork\vision rl\baselines\train_expanded_baselines.py' --steps 30000"
+# 3. Execute scale experiment (new primary runner)
+C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -Command "cd 'd:\gitfork\vision rl'; .\venv\Scripts\Activate.ps1; python baselines\run_scale_experiment.py"
 
 # 4. Deploy to remote GPU cluster
-C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -Command "& 'C:\Users\shoun\AppData\Local\Programs\Python\Python310\python.exe' 'd:\gitfork\vision rl\baselines\deploy_remote_gpu.py'"
+C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -Command "cd 'd:\gitfork\vision rl'; .\venv\Scripts\Activate.ps1; python baselines\deploy_remote_gpu.py"
 ```

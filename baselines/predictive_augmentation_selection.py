@@ -14,12 +14,10 @@ if WORKSPACE_DIR not in sys.path:
     sys.path.insert(0, WORKSPACE_DIR)
 os.chdir(WORKSPACE_DIR)
 
-import envs.tracking_envs
 from envs.wrappers import (
-    CompoundShiftWrapper, 
     RandomShiftWrapper, ColorJitterWrapper, CutoutWrapper, BlurWrapper
 )
-from utils.eval_pipeline import evaluate_policy_canonical
+from baselines.run_scale_experiment import SHIFT_CONDITIONS
 
 def compute_centroid_distance(clean_feats, shifted_feats):
     clean_centroid = np.mean(clean_feats, axis=0)
@@ -33,7 +31,6 @@ def run_predictive_selection():
     env_id = "SingleObjectTracking-v0"
     seed = 42
     
-    # 1. Ensure we have a trained baseline model
     model_path = f"results/models/PPO_Standard_{env_id}_s{seed}.zip"
     if not os.path.exists(model_path):
         print(f"Model {model_path} not found. Training a quick baseline...")
@@ -48,133 +45,138 @@ def run_predictive_selection():
     feature_extractor = model.policy.features_extractor
     feature_extractor.eval()
     
-    # Target Held-Out Perturbation
-    target_shift_cls = CompoundShiftWrapper
-    target_shift_kwargs = {"severity_level": 3}
+    # Exclude Clean from target shifts
+    target_shifts = [s for s in SHIFT_CONDITIONS if s[0] != "Clean"]
     
-    # Candidate Test-Time Augmentations (TTA)
     candidates = [
         ("No_Augmentation", None, {}),
-        ("Color_Jitter", ColorJitterWrapper, {"brightness": 0.3, "contrast": 0.3}),
-        ("Random_Shift", RandomShiftWrapper, {"max_shift": 6}),
-        ("Cutout", CutoutWrapper, {"cutout_ratio": 0.2}),
-        ("Blur", BlurWrapper, {"kernel_size": 5})
+        ("Color_Jitter_Low", ColorJitterWrapper, {"brightness": 0.1, "contrast": 0.1}),
+        ("Color_Jitter_Med", ColorJitterWrapper, {"brightness": 0.3, "contrast": 0.3}),
+        ("Color_Jitter_High", ColorJitterWrapper, {"brightness": 0.5, "contrast": 0.5}),
+        ("Random_Shift_Low", RandomShiftWrapper, {"max_shift": 2}),
+        ("Random_Shift_Med", RandomShiftWrapper, {"max_shift": 4}),
+        ("Random_Shift_High", RandomShiftWrapper, {"max_shift": 6}),
+        ("Cutout_Low", CutoutWrapper, {"cutout_ratio": 0.05}),
+        ("Cutout_Med", CutoutWrapper, {"cutout_ratio": 0.15}),
+        ("Cutout_High", CutoutWrapper, {"cutout_ratio": 0.3}),
+        ("Blur_K3", BlurWrapper, {"kernel_size": 3}),
+        ("Blur_K5", BlurWrapper, {"kernel_size": 5}),
+        ("Blur_K7", BlurWrapper, {"kernel_size": 7})
     ]
+    
+    def collect_features_random_reset(env, n_samples=200):
+        """Fix Bug 1: Collect features from a fixed, policy-independent observation distribution."""
+        feats = []
+        device = next(feature_extractor.parameters()).device
+        for i in range(n_samples):
+            obs, _ = env.reset(seed=seed * 1000 + i)
+            obs_t = torch.as_tensor(obs).unsqueeze(0).float() / 255.0
+            obs_t = obs_t.to(device)
+            with torch.no_grad():
+                feats.append(feature_extractor(obs_t).cpu().numpy()[0])
+        return np.array(feats)
     
     # 2. Collect Clean Centroid
     env_clean = gym.make(env_id)
-    clean_feats = []
-    obs_c, _ = env_clean.reset(seed=seed)
-    for _ in range(200):
-        action, _ = model.predict(obs_c, deterministic=True)
-        obs_t = torch.as_tensor(obs_c).unsqueeze(0).float() / 255.0
-        with torch.no_grad():
-            clean_feats.append(feature_extractor(obs_t).numpy()[0])
-        obs_c, _, term, trunc, _ = env_clean.step(action)
-        if term or trunc:
-            obs_c, _ = env_clean.reset()
+    clean_feats = collect_features_random_reset(env_clean, n_samples=200)
     env_clean.close()
     
-    # 3. Proxy Ranking (Computationally Cheap)
-    print("\n--- Phase 1: Proxy Ranking (Representation Distance) ---")
-    proxy_results = []
-    start_time_proxy = time.time()
+    all_proxy_results = []
+    all_gt_results = []
     
-    for aug_name, aug_cls, aug_kwargs in candidates:
-        # Wrap target shift
-        env_shifted = target_shift_cls(gym.make(env_id), **target_shift_kwargs)
-        # Apply augmentation on top
-        if aug_cls is not None:
-            env_aug = aug_cls(env_shifted, **aug_kwargs)
-        else:
-            env_aug = env_shifted
+    start_time_total = time.time()
+    proxy_total_time = 0.0
+    gt_total_time = 0.0
+    
+    print("\n--- Running Evaluations across Target Shifts ---")
+    for shift_name, shift_cls, shift_kwargs in target_shifts:
+        print(f"Shift: {shift_name}")
+        shift_proxy = []
+        shift_gt = []
+        
+        # Proxy Evaluation
+        t0 = time.time()
+        for aug_name, aug_cls, aug_kwargs in candidates:
+            env_shifted = shift_cls(gym.make(env_id), **shift_kwargs)
+            env_aug = aug_cls(env_shifted, **aug_kwargs) if aug_cls else env_shifted
             
-        shifted_feats = []
-        obs_s, _ = env_aug.reset(seed=seed)
-        # Only collect a few observations WITHOUT running full evaluation episodes
-        for _ in range(200):
-            action, _ = model.predict(obs_s, deterministic=True)
-            obs_st = torch.as_tensor(obs_s).unsqueeze(0).float() / 255.0
-            with torch.no_grad():
-                shifted_feats.append(feature_extractor(obs_st).numpy()[0])
-            obs_s, _, term, trunc, _ = env_aug.step(action)
-            if term or trunc:
-                obs_s, _ = env_aug.reset()
-        env_aug.close()
-        
-        dist = compute_centroid_distance(clean_feats, shifted_feats)
-        proxy_results.append({"Augmentation": aug_name, "Rep_Distance": dist})
-        print(f"  {aug_name} -> Distance: {dist:.3f}")
-        
-    proxy_time = time.time() - start_time_proxy
-    
-    # Rank by lowest distance
-    proxy_df = pd.DataFrame(proxy_results).sort_values("Rep_Distance")
-    proxy_df["Proxy_Rank"] = range(1, len(candidates) + 1)
-    
-    # 4. Ground-Truth Ranking (Computationally Expensive Rollouts)
-    print("\n--- Phase 2: Ground-Truth Ranking (Full RL Rollouts) ---")
-    gt_results = []
-    start_time_gt = time.time()
-    
-    for aug_name, aug_cls, aug_kwargs in candidates:
-        def make_eval_env():
-            env_shifted = target_shift_cls(gym.make(env_id), **target_shift_kwargs)
-            if aug_cls is not None:
-                return aug_cls(env_shifted, **aug_kwargs)
-            return env_shifted
+            shifted_feats = collect_features_random_reset(env_aug, n_samples=200)
+            env_aug.close()
             
-        # We need to adapt evaluate_policy_canonical to use an env factory or pre-wrapped env
-        # For simplicity, we just run the rollouts here
-        env_eval = make_eval_env()
-        successes = []
-        returns = []
-        for ep in range(30): # 30 full episodes for accurate GT
-            obs, info = env_eval.reset(seed=seed*100 + ep)
-            ep_ret = 0
-            ep_success = 0
-            done = False
-            while not done:
-                action, _ = model.predict(obs, deterministic=True)
-                obs, reward, term, trunc, info = env_eval.step(action)
-                ep_ret += reward
-                if info.get('sparse_reward', 0) > 0 or info.get('success', 0) > 0:
-                    ep_success = 1
-                done = term or trunc
-            successes.append(ep_success)
-            returns.append(ep_ret)
-        env_eval.close()
+            dist = compute_centroid_distance(clean_feats, shifted_feats)
+            shift_proxy.append({
+                "Shift_Condition": shift_name, 
+                "Augmentation": aug_name, 
+                "Rep_Distance": dist
+            })
+        proxy_total_time += (time.time() - t0)
         
-        mean_succ = np.mean(successes)
-        mean_ret = np.mean(returns)
+        proxy_df = pd.DataFrame(shift_proxy).sort_values("Rep_Distance")
+        proxy_df["Proxy_Rank"] = range(1, len(candidates) + 1)
+        all_proxy_results.append(proxy_df)
         
-        gt_results.append({"Augmentation": aug_name, "Success_Rate": mean_succ, "Mean_Return": mean_ret})
-        print(f"  {aug_name} -> Success: {mean_succ:.2f}, Return: {mean_ret:.2f}")
+        # Ground Truth Evaluation
+        t1 = time.time()
+        for aug_name, aug_cls, aug_kwargs in candidates:
+            env_shifted = shift_cls(gym.make(env_id), **shift_kwargs)
+            env_eval = aug_cls(env_shifted, **aug_kwargs) if aug_cls else env_shifted
+            
+            returns = []
+            for ep in range(15): # using 15 episodes to speed up GT for 10x13 conditions
+                obs, info = env_eval.reset(seed=seed*100 + ep)
+                ep_ret = 0
+                done = False
+                while not done:
+                    action, _ = model.predict(obs, deterministic=True)
+                    obs, reward, term, trunc, _ = env_eval.step(action)
+                    ep_ret += reward
+                    done = term or trunc
+                returns.append(ep_ret)
+            env_eval.close()
+            
+            shift_gt.append({
+                "Shift_Condition": shift_name, 
+                "Augmentation": aug_name, 
+                "Mean_Return": np.mean(returns)
+            })
+        gt_total_time += (time.time() - t1)
         
-    gt_time = time.time() - start_time_gt
+        gt_df = pd.DataFrame(shift_gt).sort_values("Mean_Return", ascending=False)
+        gt_df["GT_Rank"] = range(1, len(candidates) + 1)
+        all_gt_results.append(gt_df)
+        
+    df_p = pd.concat(all_proxy_results)
+    df_g = pd.concat(all_gt_results)
+    final_df = pd.merge(df_p, df_g, on=["Shift_Condition", "Augmentation"])
     
-    # Rank by highest success/return
-    gt_df = pd.DataFrame(gt_results).sort_values("Mean_Return", ascending=False)
-    gt_df["GT_Rank"] = range(1, len(candidates) + 1)
-    
-    # 5. Compare & Save
-    final_df = pd.merge(proxy_df, gt_df, on="Augmentation")
     print("\n--- Final Comparison ---")
-    print(final_df[["Augmentation", "Proxy_Rank", "GT_Rank", "Rep_Distance", "Mean_Return"]])
+    print(final_df.head(20)) # Print a sample
     
+    # Pooled Spearman correlation on ranks
     spearman_rho, s_p = stats.spearmanr(final_df["Proxy_Rank"], final_df["GT_Rank"])
-    print(f"\nSpearman Rank Correlation: {spearman_rho:.3f} (p={s_p:.3f})")
-    print(f"Compute Time Saved: Proxy took {proxy_time:.2f}s vs Ground-Truth took {gt_time:.2f}s (Speedup: {gt_time/proxy_time:.1f}x)")
+    n_samples = len(final_df)
+    print(f"\nPOOLED Spearman Rank Correlation (Proxy Rank vs GT Rank, n={n_samples}): {spearman_rho:.3f} (p={s_p:.3e})")
+    print(f"Compute Time Saved: Proxy {proxy_total_time:.2f}s vs GT {gt_total_time:.2f}s (Speedup: {gt_total_time/proxy_total_time:.1f}x)")
     
+    # Compute per-shift correlation for interpretability
+    per_shift_rhos = {}
+    for shift_name in final_df["Shift_Condition"].unique():
+        shift_data = final_df[final_df["Shift_Condition"] == shift_name]
+        rho, p = stats.spearmanr(shift_data["Proxy_Rank"], shift_data["GT_Rank"])
+        per_shift_rhos[shift_name] = {"rho": rho, "p_value": p}
+        print(f"  {shift_name}: rho={rho:.3f}")
+
     final_df.to_csv("results/tables/predictive_selection.csv", index=False)
     with open("results/tables/predictive_selection_summary.json", "w") as f:
         json.dump({
-            "Spearman_rho": spearman_rho,
-            "Spearman_p": s_p,
-            "Proxy_Time_Seconds": proxy_time,
-            "Ground_Truth_Time_Seconds": gt_time,
-            "Speedup_Factor": gt_time / proxy_time if proxy_time > 0 else 0
+            "Pooled_Spearman_rho": spearman_rho,
+            "Pooled_Spearman_p": s_p,
+            "N_Pairs": n_samples,
+            "Per_Shift_Correlations": per_shift_rhos,
+            "Proxy_Time_Seconds": proxy_total_time,
+            "Ground_Truth_Time_Seconds": gt_total_time,
+            "Speedup_Factor": gt_total_time / proxy_total_time if proxy_total_time > 0 else 0
         }, f, indent=2)
-        
+
 if __name__ == "__main__":
     run_predictive_selection()

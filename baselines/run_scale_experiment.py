@@ -97,8 +97,9 @@ def run_experiment():
                 for _ in range(100):
                     action, _ = model.predict(obs_c, deterministic=True)
                     obs_t = torch.as_tensor(obs_c).unsqueeze(0).float() / 255.0
+                    obs_t = obs_t.to(next(feature_extractor.parameters()).device)
                     with torch.no_grad():
-                        clean_feats.append(feature_extractor(obs_t).numpy()[0])
+                        clean_feats.append(feature_extractor(obs_t).cpu().numpy()[0])
                     obs_c, _, term, trunc, _ = env_clean.step(action)
                     if term or trunc:
                         obs_c, _ = env_clean.reset()
@@ -118,8 +119,9 @@ def run_experiment():
                         for _ in range(100):
                             act_s, _ = model.predict(obs_s, deterministic=True)
                             obs_st = torch.as_tensor(obs_s).unsqueeze(0).float() / 255.0
+                            obs_st = obs_st.to(next(feature_extractor.parameters()).device)
                             with torch.no_grad():
-                                shifted_feats.append(feature_extractor(obs_st).numpy()[0])
+                                shifted_feats.append(feature_extractor(obs_st).cpu().numpy()[0])
                             obs_s, _, term, trunc, _ = env_s.step(act_s)
                             if term or trunc:
                                 obs_s, _ = env_s.reset()
@@ -153,12 +155,11 @@ def run_experiment():
         # Calculate degradation
         df_shift = df_env[df_env["Shift_Condition"] != "Clean"].copy()
         
-        # Use success rate if it's there and > 0 for clean, else mean return
+        # Use Mean_Return consistently to avoid metric switching bugs
         perfs, dists = [], []
         for idx, row in df_shift.iterrows():
             c_perf = clean_perf.loc[(row["Algorithm"], row["Seed"])]
-            perf_metric = "Success_Rate" if c_perf["Success_Rate"] > 0 else "Mean_Return"
-            perf_deg = c_perf[perf_metric] - row[perf_metric]
+            perf_deg = c_perf["Mean_Return"] - row["Mean_Return"]
             perfs.append(perf_deg)
             dists.append(row["Representation_Distance"])
             
