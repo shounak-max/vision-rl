@@ -8,7 +8,7 @@ import torch
 import gymnasium as gym
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import SubprocVecEnv
+from stable_baselines3.common.vec_env import SubprocVecEnv, DummyVecEnv
 from scipy import stats
 
 WORKSPACE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -16,13 +16,19 @@ if WORKSPACE_DIR not in sys.path:
     sys.path.insert(0, WORKSPACE_DIR)
 os.chdir(WORKSPACE_DIR)
 
+import procgen
 import envs.tracking_envs
 from envs.wrappers import (
     NoiseWrapper, DistractorWrapper, ViewpointWrapper, 
     OcclusionWrapper, BlurWrapper, CompoundShiftWrapper, DataAugmentationWrapper,
-    RandomShiftWrapper, ColorJitterWrapper, CutoutWrapper
+    RandomShiftWrapper, ColorJitterWrapper, CutoutWrapper, ProcgenGymnasiumWrapper
 )
-from utils.eval_pipeline import evaluate_policy_canonical
+from utils.eval_pipeline import evaluate_policy_canonical, make_env_canonical
+
+def make_env_canonical(env_id):
+    if env_id.startswith("procgen"):
+        return ProcgenGymnasiumWrapper(env_id)
+    return gym.make(env_id)
 
 SEEDS = [0, 42, 100, 123, 999]
 ENVS = ["procgen:procgen-coinrun-v0", "MultiStageNavigation-v0"]
@@ -61,10 +67,10 @@ def run_experiment():
     all_eval_rows = []
 
     for env_id in ENVS:
-        for algo in ["PPO_Standard", "DrQ_PPO"]:
+        for algo in ["PPO_Standard", "DataAugmented_PPO"]:
             for seed in SEEDS:
                 total_steps = get_total_steps(env_id)
-                run_id = f"{algo}_{env_id}_s{seed}"
+                run_id = f"{algo}_{env_id.replace(':', '_')}_s{seed}"
                 print(f"\n=======================================================")
                 print(f"   STARTING RUN: {run_id} ({total_steps} steps)")
                 print(f"=======================================================")
@@ -74,10 +80,11 @@ def run_experiment():
                 if not os.path.exists(model_save_path):
                     # Setup vector environment
                     if algo == "PPO_Standard":
-                        vec_env = make_vec_env(env_id, n_envs=2, seed=seed, vec_env_cls=SubprocVecEnv)
-                    else: # DrQ_PPO baseline
-                        aug_env_fn = lambda: DataAugmentationWrapper(gym.make(env_id))
-                        vec_env = make_vec_env(aug_env_fn, n_envs=2, seed=seed, vec_env_cls=SubprocVecEnv)
+                        env_fn = lambda: make_env_canonical(env_id)
+                        vec_env = DummyVecEnv([env_fn for _ in range(4)])
+                    else: # DataAugmented_PPO baseline
+                        aug_env_fn = lambda: DataAugmentationWrapper(make_env_canonical(env_id))
+                        vec_env = DummyVecEnv([aug_env_fn for _ in range(4)])
                         
                     model = PPO("CnnPolicy", vec_env, verbose=0, seed=seed, n_steps=512, learning_rate=3e-4)
                     model.learn(total_timesteps=total_steps)
@@ -89,15 +96,16 @@ def run_experiment():
                 
                 feature_extractor = model.policy.features_extractor
                 feature_extractor.eval()
+                device = next(feature_extractor.parameters()).device
                 
                 # Clean Features
-                env_clean = gym.make(env_id)
+                env_clean = make_env_canonical(env_id)
                 clean_feats = []
                 obs_c, _ = env_clean.reset(seed=seed * 100)
                 for _ in range(100):
                     action, _ = model.predict(obs_c, deterministic=True)
                     obs_t = torch.as_tensor(obs_c).unsqueeze(0).float() / 255.0
-                    obs_t = obs_t.to(next(feature_extractor.parameters()).device)
+                    obs_t = obs_t.to(device)
                     with torch.no_grad():
                         clean_feats.append(feature_extractor(obs_t).cpu().numpy()[0])
                     obs_c, _, term, trunc, _ = env_clean.step(action)
@@ -108,18 +116,19 @@ def run_experiment():
                 
                 for shift_name, wrapper_cls, wrapper_kwargs in SHIFT_CONDITIONS:
                     if wrapper_cls is None:
-                        # Clean eval
-                        metrics = evaluate_policy_canonical(model, env_id, n_episodes=15, seed=seed)
+                        # Clean eval across 50 canonical episodes
+                        metrics = evaluate_policy_canonical(model, env_id, n_episodes=50, seed=seed)
                         d_euc = 0.0
                     else:
-                        metrics = evaluate_policy_canonical(model, env_id, n_episodes=15, seed=seed, wrapper_cls=wrapper_cls, wrapper_kwargs=wrapper_kwargs)
-                        env_s = wrapper_cls(gym.make(env_id), **wrapper_kwargs)
+                        metrics = evaluate_policy_canonical(model, env_id, n_episodes=50, seed=seed, wrapper_cls=wrapper_cls, wrapper_kwargs=wrapper_kwargs)
+                        base_shift_env = make_env_canonical(env_id)
+                        env_s = wrapper_cls(base_shift_env, **wrapper_kwargs)
                         shifted_feats = []
                         obs_s, _ = env_s.reset(seed=seed * 100)
                         for _ in range(100):
                             act_s, _ = model.predict(obs_s, deterministic=True)
                             obs_st = torch.as_tensor(obs_s).unsqueeze(0).float() / 255.0
-                            obs_st = obs_st.to(next(feature_extractor.parameters()).device)
+                            obs_st = obs_st.to(device)
                             with torch.no_grad():
                                 shifted_feats.append(feature_extractor(obs_st).cpu().numpy()[0])
                             obs_s, _, term, trunc, _ = env_s.step(act_s)
@@ -137,7 +146,7 @@ def run_experiment():
                         "Mean_Return": metrics.get('mean_return', 0.0),
                         "Representation_Distance": d_euc
                     })
-                    print(f"  [{shift_name}] RepDist: {d_euc:.3f} | Perf: {metrics.get('success_rate', metrics.get('mean_return', 0.0)):.2f}")
+                    print(f"  [{shift_name}] RepDist: {d_euc:.3f} | MeanReturn: {metrics.get('mean_return', 0.0):.2f} | SuccRate: {metrics.get('success_rate', 0.0):.2f}")
 
     df_results = pd.DataFrame(all_eval_rows)
     df_results.to_csv("results/tables/scale_experiment_results.csv", index=False)
@@ -148,14 +157,9 @@ def run_experiment():
         df_env = df_results[df_results["Env"] == env_id]
         if len(df_env) == 0: continue
         
-        # We compute correlation between distance and performance degradation
-        # First get clean performance per seed/algo
         clean_perf = df_env[df_env["Shift_Condition"] == "Clean"].set_index(["Algorithm", "Seed"])
-        
-        # Calculate degradation
         df_shift = df_env[df_env["Shift_Condition"] != "Clean"].copy()
         
-        # Use Mean_Return consistently to avoid metric switching bugs
         perfs, dists = [], []
         for idx, row in df_shift.iterrows():
             c_perf = clean_perf.loc[(row["Algorithm"], row["Seed"])]
@@ -170,7 +174,8 @@ def run_experiment():
         print(f"  Pearson r = {pearson_r:.4f} (p={p_p:.4e})")
         print(f"  Spearman rho = {spearman_rho:.4f} (p={s_p:.4e})")
 
-        with open(f"results/tables/correlation_{env_id}.json", "w") as f:
+        clean_env_name = env_id.replace(":", "_")
+        with open(f"results/tables/correlation_{clean_env_name}.json", "w") as f:
             json.dump({"Pearson_r": pearson_r, "Pearson_p": p_p, "Spearman_rho": spearman_rho, "Spearman_p": s_p}, f, indent=2)
 
 if __name__ == "__main__":

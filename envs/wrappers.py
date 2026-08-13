@@ -248,3 +248,56 @@ class CompoundShiftWrapper(gym.ObservationWrapper):
     def observation(self, obs):
         return self.compound_env.observation(obs)
 
+class ProcgenGymnasiumWrapper(gym.Env):
+    """
+    Adapter wrapper converting legacy gym Procgen env into Gymnasium format
+    with channel-first observation (C, H, W) for SB3 CnnPolicy.
+    """
+    metadata = {"render_modes": ["rgb_array"]}
+
+    def __init__(self, env_id="procgen:procgen-coinrun-v0", distribution_mode="easy"):
+        super().__init__()
+        import gym as legacy_gym
+        self._env = legacy_gym.make(env_id, distribution_mode=distribution_mode)
+        obs_space = self._env.observation_space
+        act_space = self._env.action_space
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(3, 64, 64), dtype=np.uint8)
+        self.action_space = gym.spaces.Discrete(act_space.n)
+
+    def reset(self, seed=None, options=None):
+        if seed is not None:
+            try:
+                self._env.seed(int(seed))
+            except Exception:
+                pass
+        obs = self._env.reset()
+        obs_chw = np.transpose(obs, (2, 0, 1))
+        return obs_chw, {}
+
+    def step(self, action):
+        obs, reward, done, info = self._env.step(action)
+        obs_chw = np.transpose(obs, (2, 0, 1))
+        
+        # Disambiguate termination vs truncation
+        is_level_complete = info.get("prev_level_complete", 0) == 1
+        is_time_limit = info.get("TimeLimit.truncated", False) or info.get("truncated", False)
+        
+        if is_time_limit:
+            terminated = False
+            truncated = True
+        elif is_level_complete:
+            terminated = True
+            truncated = False
+        else:
+            terminated = done
+            truncated = False
+            
+        return obs_chw, reward, terminated, truncated, info
+
+    def render(self):
+        return self._env.render(mode="rgb_array")
+
+    def close(self):
+        self._env.close()
+
+

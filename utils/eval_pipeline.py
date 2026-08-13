@@ -30,6 +30,12 @@ def compute_stat_ci95(data):
         "formatted": f"{mean:.2f} ± {ci95:.2f}"
     }
 
+def make_env_canonical(env_id):
+    if env_id.startswith("procgen"):
+        from envs.wrappers import ProcgenGymnasiumWrapper
+        return ProcgenGymnasiumWrapper(env_id)
+    return gym.make(env_id)
+
 def evaluate_policy_canonical(model, env_id, n_episodes=20, seed=42, wrapper_cls=None, wrapper_kwargs=None, is_bc=False, bc_policy=None):
     """
     Standardized, canonical evaluation routine for all models across all environments.
@@ -40,7 +46,7 @@ def evaluate_policy_canonical(model, env_id, n_episodes=20, seed=42, wrapper_cls
     if wrapper_kwargs is None:
         wrapper_kwargs = {}
         
-    env = gym.make(env_id)
+    env = make_env_canonical(env_id)
     if wrapper_cls is not None:
         env = wrapper_cls(env, **wrapper_kwargs)
         
@@ -58,7 +64,6 @@ def evaluate_policy_canonical(model, env_id, n_episodes=20, seed=42, wrapper_cls
         
         while not done:
             if model is None and not is_bc:
-                # Uniform random policy baseline
                 action = env.action_space.sample()
             elif is_bc:
                 obs_t = torch.as_tensor(obs).unsqueeze(0).float() / 255.0
@@ -78,13 +83,17 @@ def evaluate_policy_canonical(model, env_id, n_episodes=20, seed=42, wrapper_cls
         episode_returns.append(ep_return)
         
         if step_cles:
-            ep_cle = np.mean(step_cles)
-            ep_succ = calculate_success_rate(step_cles, threshold=10.0)
+            ep_cle = float(np.mean(step_cles))
+            # Episode success: mean CLE < 10.0 pixels across trajectory
+            ep_succ = 1.0 if ep_cle < 10.0 else 0.0
             episode_mean_cles.append(ep_cle)
             episode_successes.append(ep_succ)
         elif 'success' in info:
             episode_successes.append(float(info['success']))
             episode_mean_cles.append(info.get('cle', 0.0))
+        elif 'prev_level_complete' in info:
+            episode_successes.append(1.0 if info.get('prev_level_complete') == 1 else 0.0)
+            episode_mean_cles.append(0.0)
             
     env.close()
     
