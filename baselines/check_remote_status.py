@@ -29,7 +29,7 @@ def check_remote_status():
     print(f"=== REMOTE GPU EXPERIMENT STATUS CHECK ({HOST}:{PORT}) ===")
     
     # 1. Check process PID
-    stdin, stdout, stderr = ssh.exec_command("ps aux | grep run_rep_distance_experiment | grep -v grep")
+    stdin, stdout, stderr = ssh.exec_command("ps aux | grep run_scale_experiment | grep -v grep")
     pid_output = stdout.read().decode('ascii', errors='ignore').strip()
     if pid_output:
         print(f"[PROCESS STATUS]: ACTIVE (RUNNING)")

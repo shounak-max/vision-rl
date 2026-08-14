@@ -93,22 +93,40 @@ def launch_detached_remote_job():
         print("Aborting launch due to sync error.")
         return
 
-    nohup_cmd = f"nohup bash -c 'source /home/piyush/miniconda3/bin/activate && conda activate rl_env && cd {REMOTE_DIR} && PYTHONPATH=. python3 baselines/run_scale_experiment.py' > {REMOTE_DIR}/results/logs/experiment_stdout.log 2>&1 &"
+    ssh = connect_ssh()
+    if not ssh:
+        print("SSH connection failed.")
+        return
+        
+    sftp = ssh.open_sftp()
+    sh_content = (
+        "#!/bin/bash\n"
+        "source /home/piyush/miniconda3/bin/activate\n"
+        "conda activate rl_env\n"
+        "cd /home/piyush/vision-rl\n"
+        "mkdir -p results/logs results/models results/tables\n"
+        "nohup python3 -u baselines/run_scale_experiment.py > results/logs/scale_experiment.log 2>&1 &\n"
+        "echo \"SCALE EXPERIMENT LAUNCHED! PID: $!\"\n"
+    )
+    with sftp.file(f"{REMOTE_DIR}/run_remote.sh", "w") as f:
+        f.write(sh_content)
+    sftp.close()
     
-    print("\n=== Launching Detached (nohup) Scale Experiment on Remote GPU Server ===")
-    out, err = execute_remote_cmd_safe(nohup_cmd)
-    print("Detached Remote Execution Command Issued!")
+    execute_remote_cmd_safe(f"chmod +x {REMOTE_DIR}/run_remote.sh")
     
-    # Wait 3 seconds and verify remote PID is running
+    print("\n=== Launching Detached Scale Experiment on Remote GPU Server ===")
+    out, _ = execute_remote_cmd_safe(f"bash {REMOTE_DIR}/run_remote.sh")
+    print(out)
+    
     time.sleep(3)
-    check_cmd = "ps aux | grep run_scale_experiment | grep -v grep"
-    pid_out, _ = execute_remote_cmd_safe(check_cmd)
-    if pid_out.strip():
-        print(f"VERIFIED REMOTE PID RUNNING:\n{pid_out}")
+    check_out, _ = execute_remote_cmd_safe("ps aux | grep run_scale_experiment | grep -v grep")
+    if check_out.strip():
+        print(f"VERIFIED REMOTE PID RUNNING:\n{check_out}")
     else:
-        print("Checking experiment_stdout.log...")
-        cat_out, _ = execute_remote_cmd_safe(f"tail -n 20 {REMOTE_DIR}/results/logs/experiment_stdout.log")
-        print(cat_out)
+        print("Checking log output...")
+        log_out, _ = execute_remote_cmd_safe(f"cat {REMOTE_DIR}/results/logs/scale_experiment.log")
+        print(log_out)
+    ssh.close()
 
 if __name__ == "__main__":
     launch_detached_remote_job()

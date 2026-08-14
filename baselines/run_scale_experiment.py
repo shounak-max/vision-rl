@@ -30,12 +30,12 @@ def make_env_canonical(env_id):
         return ProcgenGymnasiumWrapper(env_id)
     return gym.make(env_id)
 
-SEEDS = [0, 42, 100, 123, 999]
+SEEDS = [0, 42, 100]
 ENVS = ["procgen:procgen-coinrun-v0", "MultiStageNavigation-v0"]
 
 def get_total_steps(env_id):
     if "procgen" in env_id:
-        return 10000000  # 10M steps for procgen
+        return 2500000  # 2.5M timesteps (trimmed confirmatory scale run)
     return 500000  # 500k for custom env
 
 # 10 Perturbation Conditions
