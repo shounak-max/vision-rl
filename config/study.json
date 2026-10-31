@@ -1,0 +1,112 @@
+{
+  "protocol_version": 1,
+  "status": "draft",
+  "agents": [
+    "drq_v2",
+    "svea",
+    "taco",
+    "madi"
+  ],
+  "environments": [
+    "visual_pursuit",
+    "procgen_coinrun",
+    "distracting_control_suite"
+  ],
+  "shift_families": [
+    "viewpoint",
+    "distractors",
+    "noise",
+    "color"
+  ],
+  "severity_levels": 10,
+  "episodes_per_level": 30,
+  "training_seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "fit_seeds": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "test_seeds": [
+    6,
+    7,
+    8,
+    9,
+    10
+  ],
+  "expected_episodes": 14400,
+  "primary_predictor": "centroid_distance",
+  "predictors": [
+    "centroid_distance",
+    "full_covariance_distance",
+    "mahalanobis_distance",
+    "grassmann_k5",
+    "grassmann_k10",
+    "grassmann_k20",
+    "semantic_weighted_distance",
+    "critic_uncertainty",
+    "rnd_score",
+    "pixel_statistics",
+    "action_entropy",
+    "severity"
+  ],
+  "classification": {
+    "correlation_weak_max": 0.3,
+    "correlation_strong_min": 0.5,
+    "auroc_low_max": 0.6,
+    "auroc_high_min": 0.8,
+    "cliff_edge_width_max": 0.2,
+    "graded_width_min": 0.5
+  },
+  "forecast_horizon_steps": 10,
+  "bootstrap_replicates": 2000,
+  "permutation_replicates": 10000,
+  "analysis_random_seed": 20261031,
+  "run_gate": {
+    "full_study_enabled": false,
+    "pilot_environment": "visual_pursuit",
+    "success_definitions": {
+      "visual_pursuit": {
+        "metric": "episode_mean_cle_pixels",
+        "success_when": "less_than",
+        "threshold": 10.0,
+        "status": "proposed_from_legacy_code"
+      },
+      "procgen_coinrun": {
+        "metric": "level_completion",
+        "success_when": "equals",
+        "threshold": 1,
+        "status": "needs_environment_adapter"
+      },
+      "distracting_control_suite": {
+        "metric": null,
+        "success_when": null,
+        "threshold": null,
+        "status": "unresolved"
+      }
+    },
+    "encoder_ablation_pass_criterion": null,
+    "random_policy_reference": null,
+    "feature_window_length": null,
+    "forecast_horizon_steps": 10,
+    "remaining_blockers": [
+      "Implement and version the official agent training/evaluation adapters.",
+      "Resolve the Distracting Control Suite task and its task-native binary success definition.",
+      "Predefine and test the encoder-ablation pass criterion and random-policy reference.",
+      "Choose and validate the feature-window length.",
+      "Verify the proposed Visual Pursuit CLE episode-success rule against the pilot environment."
+    ]
+  }
+}
