@@ -1,10 +1,16 @@
 import os
 import paramiko
 HOST = os.environ.get("VISION_RL_SSH_HOST")
-PORT = 2222
+PORT = int(os.environ.get("VISION_RL_SSH_PORT", "2222"))
 USERNAME = os.environ.get("VISION_RL_SSH_USERNAME")
-REMOTE_DIR = "/home/piyush/vision-rl"
-LOCAL_WORKSPACE = "d:/gitfork/vision rl"
+REMOTE_DIR = os.environ.get(
+    "VISION_RL_REMOTE_DIR",
+    os.path.join("/home", USERNAME or "user", "vision-rl"),
+)
+LOCAL_WORKSPACE = os.environ.get(
+    "VISION_RL_LOCAL_WORKSPACE",
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+)
 
 print("=== CHECKING COMPLETED SCALE EXPERIMENT RESULTS & SYNCING ===")
 if not HOST or not USERNAME:

@@ -128,7 +128,10 @@ def evaluate_predictor(
     fit_rows: Sequence[Dict[str, str]],
     test_rows: Sequence[Dict[str, str]],
     predictor: str,
+    orientation_margin: float = 0.05,
 ) -> Dict[str, Any]:
+    if not 0.0 <= orientation_margin < 0.5:
+        raise ValueError("orientation_margin must be in [0, 0.5).")
     score_direction, raw_fit_auroc = fit_failure_score_direction(
         fit_rows, predictor
     )
@@ -146,6 +149,8 @@ def evaluate_predictor(
     metrics.update({
         "score_direction": score_direction,
         "raw_fit_auroc": raw_fit_auroc,
+        "orientation_margin": orientation_margin,
+        "orientation_reliable": abs(raw_fit_auroc - 0.5) > orientation_margin,
         "threshold_fit_on_training_families": threshold,
         "threshold_test_accuracy": accuracy,
         "threshold_test_sensitivity": sensitivity,
@@ -296,6 +301,7 @@ def seed_blocked_bootstrap_ci(
     replicates: int,
     random_seed: int,
     score_directions: Optional[Dict[Tuple[str, str, str], int]] = None,
+    orientation_reliability: Optional[Dict[Tuple[str, str, str], bool]] = None,
 ) -> Dict[str, Any]:
     """Bootstrap test seeds within each agent/environment, keeping their rows together."""
     if replicates < 1:
@@ -329,6 +335,11 @@ def seed_blocked_bootstrap_ci(
         for cell, regime_result in regimes.items():
             regime = regime_result["regime"]
             if regime not in ("cliff_edge", "graded"):
+                continue
+            if (
+                orientation_reliability is not None
+                and not orientation_reliability.get(cell, False)
+            ):
                 continue
             stratum = (cell[0], cell[1])
             rows_by_seed = cell_seed_rows.get(cell, {})

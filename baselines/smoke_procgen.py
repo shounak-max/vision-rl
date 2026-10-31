@@ -41,10 +41,15 @@ def run_procgen_smoke_test(total_timesteps=50000, seed=42):
     os.makedirs("results/tables", exist_ok=True)
     os.makedirs("results/models", exist_ok=True)
 
-    def make_env():
-        return ProcgenGymnasiumWrapper("procgen:procgen-coinrun-v0")
-
-    vec_env = DummyVecEnv([make_env for _ in range(4)])
+    env_fns = [
+        lambda rank=rank: ProcgenGymnasiumWrapper(
+            "procgen:procgen-coinrun-v0",
+            split="train",
+            seed=seed + rank,
+        )
+        for rank in range(4)
+    ]
+    vec_env = DummyVecEnv(env_fns)
     
     model_path = f"results/models/smoke_ppo_procgen_s{seed}.zip"
     if os.path.exists(model_path):
@@ -64,7 +69,11 @@ def run_procgen_smoke_test(total_timesteps=50000, seed=42):
     eval_results = []
 
     for shift_name, wrapper_cls, wrapper_kwargs in SHIFT_CONDITIONS:
-        base_env = ProcgenGymnasiumWrapper("procgen:procgen-coinrun-v0")
+        base_env = ProcgenGymnasiumWrapper(
+            "procgen:procgen-coinrun-v0",
+            split="evaluation",
+            seed=seed * 1000 + 3,
+        )
         if wrapper_cls is not None:
             eval_env = wrapper_cls(base_env, **wrapper_kwargs)
         else:

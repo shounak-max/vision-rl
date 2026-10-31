@@ -73,11 +73,10 @@ class SingleObjectTrackingEnv(gym.Env):
         canvas = np.zeros((self.canvas_size, self.canvas_size, 3), dtype=np.uint8)
         # Draw object (green circle)
         cv2.circle(canvas, tuple(self.obj_pos.astype(int)), 5, (0, 255, 0), -1)
-        # Draw tracker (red crosshair)
+        # Draw tracker (blue crosshair)
         tx, ty = self.tracker_pos.astype(int)
         cv2.line(canvas, (tx - 5, ty), (tx + 5, ty), (0, 0, 255), 1)
         cv2.line(canvas, (tx, ty - 5), (tx, ty + 5), (0, 0, 255), 1)
         
         # stable-baselines3 uses channel-first (C, H, W)
         return np.transpose(canvas, (2, 0, 1))
-

@@ -25,9 +25,11 @@ from envs.wrappers import (
 )
 from utils.eval_pipeline import evaluate_policy_canonical, make_env_canonical
 
-def make_env_canonical(env_id):
+def make_env_canonical(env_id, seed=0, procgen_split="evaluation"):
     if env_id.startswith("procgen"):
-        return ProcgenGymnasiumWrapper(env_id)
+        return ProcgenGymnasiumWrapper(
+            env_id, split=procgen_split, seed=seed
+        )
     return gym.make(env_id)
 
 SEEDS = [0, 42, 100]
@@ -80,11 +82,25 @@ def run_experiment():
                 if not os.path.exists(model_save_path):
                     # Setup vector environment
                     if algo == "PPO_Standard":
-                        env_fn = lambda: make_env_canonical(env_id)
-                        vec_env = DummyVecEnv([env_fn for _ in range(4)])
+                        env_fns = [
+                            lambda rank=rank: make_env_canonical(
+                                env_id, seed=seed + rank, procgen_split="train"
+                            )
+                            for rank in range(4)
+                        ]
+                        vec_env = DummyVecEnv(env_fns)
                     else: # DataAugmented_PPO baseline
-                        aug_env_fn = lambda: DataAugmentationWrapper(make_env_canonical(env_id))
-                        vec_env = DummyVecEnv([aug_env_fn for _ in range(4)])
+                        env_fns = [
+                            lambda rank=rank: DataAugmentationWrapper(
+                                make_env_canonical(
+                                    env_id,
+                                    seed=seed + rank,
+                                    procgen_split="train",
+                                )
+                            )
+                            for rank in range(4)
+                        ]
+                        vec_env = DummyVecEnv(env_fns)
                         
                     model = PPO("CnnPolicy", vec_env, verbose=0, seed=seed, n_steps=512, learning_rate=3e-4)
                     model.learn(total_timesteps=total_steps)

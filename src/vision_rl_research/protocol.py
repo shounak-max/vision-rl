@@ -33,6 +33,7 @@ def validate_protocol(protocol: Dict[str, Any]) -> None:
         "bootstrap_replicates",
         "permutation_replicates",
         "analysis_random_seed",
+        "orientation_auc_margin",
         "run_gate",
     )
     missing = [key for key in required if key not in protocol]
@@ -50,6 +51,8 @@ def validate_protocol(protocol: Dict[str, Any]) -> None:
         raise ProtocolError("Fit and test seeds must partition training_seeds.")
     if protocol["primary_predictor"] not in protocol["predictors"]:
         raise ProtocolError("primary_predictor must be in predictors.")
+    if not 0.0 <= protocol["orientation_auc_margin"] < 0.5:
+        raise ProtocolError("orientation_auc_margin must be in [0, 0.5).")
 
     classification = protocol["classification"]
     expected_orderings = (

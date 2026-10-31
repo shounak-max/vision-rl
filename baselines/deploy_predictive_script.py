@@ -3,11 +3,22 @@ import sys
 import time
 import paramiko
 HOST = os.environ.get("VISION_RL_SSH_HOST")
-PORT = 2222
+PORT = int(os.environ.get("VISION_RL_SSH_PORT", "2222"))
 USERNAME = os.environ.get("VISION_RL_SSH_USERNAME")
 
-REMOTE_DIR = "/home/piyush/vision-rl"
-LOCAL_WORKSPACE = "d:/gitfork/vision rl"
+REMOTE_DIR = os.environ.get(
+    "VISION_RL_REMOTE_DIR",
+    os.path.join("/home", USERNAME or "user", "vision-rl"),
+)
+LOCAL_WORKSPACE = os.environ.get(
+    "VISION_RL_LOCAL_WORKSPACE",
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+)
+REMOTE_ACTIVATE_SCRIPT = os.environ.get(
+    "VISION_RL_REMOTE_ACTIVATE_SCRIPT",
+    os.path.join("/home", USERNAME or "user", "miniconda3", "bin", "activate"),
+)
+REMOTE_CONDA_ENV = os.environ.get("VISION_RL_REMOTE_CONDA_ENV", "rl_env")
 
 def connect_ssh():
     if not HOST or not USERNAME:
@@ -99,7 +110,7 @@ def launch_detached_remote_job():
         print("Aborting launch due to sync error.")
         return
 
-    nohup_cmd = f"nohup bash -c 'source /home/piyush/miniconda3/bin/activate && conda activate rl_env && cd {REMOTE_DIR} && PYTHONPATH=. python3 baselines/predictive_augmentation_selection.py' > {REMOTE_DIR}/results/logs/predictive_stdout.log 2>&1 &"
+    nohup_cmd = f"nohup bash -c 'source {REMOTE_ACTIVATE_SCRIPT} && conda activate {REMOTE_CONDA_ENV} && cd {REMOTE_DIR} && PYTHONPATH=. python3 baselines/predictive_augmentation_selection.py' > {REMOTE_DIR}/results/logs/predictive_stdout.log 2>&1 &"
     
     print("\n=== Launching Detached (nohup) Predictive Script on Remote GPU Server ===")
     out, err = execute_remote_cmd_safe(nohup_cmd)

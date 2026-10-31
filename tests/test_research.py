@@ -182,6 +182,25 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(result["auroc"], 1.0)
         self.assertEqual(result["threshold_test_accuracy"], 1.0)
 
+    def test_unreliable_fit_orientation_is_flagged(self):
+        fit_rows = [
+            {"centroid_distance": "0.5", "success": "1"},
+            {"centroid_distance": "0.5", "success": "0"},
+            {"centroid_distance": "0.5", "success": "1"},
+            {"centroid_distance": "0.5", "success": "0"},
+        ]
+        test_rows = [
+            {"centroid_distance": "0.2", "success": "1"},
+            {"centroid_distance": "0.8", "success": "0"},
+            {"centroid_distance": "0.3", "success": "1"},
+            {"centroid_distance": "0.7", "success": "0"},
+        ]
+        result = evaluate_predictor(
+            fit_rows, test_rows, "centroid_distance", orientation_margin=0.05
+        )
+        self.assertEqual(result["raw_fit_auroc"], 0.5)
+        self.assertFalse(result["orientation_reliable"])
+
     def test_average_precision_is_invariant_to_order_with_tied_scores(self):
         first = _binary_metrics(
             labels=np.array([1, 0, 1, 0]),
@@ -279,6 +298,47 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(result["difference_ci_lower"], 0.0)
         self.assertEqual(result["difference_ci_upper"], 0.0)
 
+    def test_bootstrap_excludes_cells_with_unreliable_orientation(self):
+        rows = []
+        for family in ("cliff", "graded"):
+            for seed in (6, 7):
+                for score, success in ((0.0, 1), (0.1, 1), (0.9, 0), (1.0, 0)):
+                    rows.append({
+                        "agent": "a",
+                        "environment": "e",
+                        "shift_family": family,
+                        "training_seed": str(seed),
+                        "centroid_distance": str(score),
+                        "success": str(success),
+                    })
+        regimes = {
+            ("a", "e", "cliff"): {"regime": "cliff_edge"},
+            ("a", "e", "graded"): {"regime": "graded"},
+        }
+        with self.assertRaisesRegex(ValueError, "No bootstrap replicate"):
+            seed_blocked_bootstrap_ci(
+                rows,
+                regimes,
+                "centroid_distance",
+                {
+                    "correlation_weak_max": 0.3,
+                    "correlation_strong_min": 0.5,
+                    "auroc_low_max": 0.6,
+                    "auroc_high_min": 0.8,
+                },
+                [6, 7],
+                10,
+                7,
+                score_directions={
+                    ("a", "e", "cliff"): 1,
+                    ("a", "e", "graded"): 1,
+                },
+                orientation_reliability={
+                    ("a", "e", "cliff"): False,
+                    ("a", "e", "graded"): True,
+                },
+            )
+
 
 class AnalysisCliTests(unittest.TestCase):
     def test_analysis_emits_preregistered_primary_test_for_both_regimes(self):
@@ -363,8 +423,15 @@ class AnalysisCliTests(unittest.TestCase):
         self.assertIn("seed_blocked_bootstrap_95_ci", result["primary_test"])
         self.assertIn("supporting_cell_rate", result["hypothesis_summaries"]["H1"])
         self.assertEqual(
-            len(result["hypothesis_summaries"]["H1"]["prevalence_context"]),
-            2,
+            len(result["hypothesis_summaries"]["prevalence_context"]),
+            4,
+        )
+        self.assertEqual(
+            {
+                item["regime"]
+                for item in result["hypothesis_summaries"]["prevalence_context"]
+            },
+            {"cliff_edge", "graded"},
         )
         self.assertEqual(len(result["hypothesis_summaries"]["H3"]), 11)
         self.assertTrue(all(

@@ -25,7 +25,10 @@ def compute_centroid_distance(clean_feats, shifted_feats):
     return float(np.linalg.norm(clean_centroid - shifted_centroid))
 
 def run_predictive_selection():
-    print("=== PREDICTIVE AUGMENTATION SELECTION EXPERIMENT ===")
+    print(
+        "=== EXPLORATORY TEST-TIME TRANSFORM SENSITIVITY "
+        "(NOT TRAINING-TIME AUGMENTATION SELECTION) ==="
+    )
     os.makedirs("results/tables", exist_ok=True)
     
     env_id = "SingleObjectTracking-v0"
@@ -153,29 +156,59 @@ def run_predictive_selection():
     print(final_df.head(20)) # Print a sample
     
     # Pooled Spearman correlation on ranks
-    spearman_rho, s_p = stats.spearmanr(final_df["Proxy_Rank"], final_df["GT_Rank"])
+    spearman_rho, _ = stats.spearmanr(
+        final_df["Proxy_Rank"], final_df["GT_Rank"]
+    )
     n_samples = len(final_df)
-    print(f"\nPOOLED Spearman Rank Correlation (Proxy Rank vs GT Rank, n={n_samples}): {spearman_rho:.3f} (p={s_p:.3e})")
-    print(f"Compute Time Saved: Proxy {proxy_total_time:.2f}s vs GT {gt_total_time:.2f}s (Speedup: {gt_total_time/proxy_total_time:.1f}x)")
+    print(
+        "\nDescriptive pooled rank association across {} dependent "
+        "shift/candidate evaluations: {:.3f} (no inferential p-value).".format(
+            n_samples, spearman_rho
+        )
+    )
+    print(
+        "Observed script timing only: proxy {:.2f}s vs rollout {:.2f}s "
+        "(ratio {:.1f}x; excludes training and is not an end-to-end "
+        "compute claim).".format(
+            proxy_total_time,
+            gt_total_time,
+            gt_total_time / proxy_total_time if proxy_total_time > 0 else 0,
+        )
+    )
     
     # Compute per-shift correlation for interpretability
     per_shift_rhos = {}
     for shift_name in final_df["Shift_Condition"].unique():
         shift_data = final_df[final_df["Shift_Condition"] == shift_name]
-        rho, p = stats.spearmanr(shift_data["Proxy_Rank"], shift_data["GT_Rank"])
-        per_shift_rhos[shift_name] = {"rho": rho, "p_value": p}
+        rho, _ = stats.spearmanr(
+            shift_data["Proxy_Rank"], shift_data["GT_Rank"]
+        )
+        per_shift_rhos[shift_name] = {"rho": rho}
         print(f"  {shift_name}: rho={rho:.3f}")
 
     final_df.to_csv("results/tables/predictive_selection.csv", index=False)
     with open("results/tables/predictive_selection_summary.json", "w") as f:
         json.dump({
+            "analysis_scope": (
+                "exploratory_test_time_transform_sensitivity; "
+                "not_training_time_augmentation_selection"
+            ),
+            "proxy_sampling": (
+                "features are collected from reset observations, not policy "
+                "rollout states"
+            ),
+            "dependence_note": (
+                "shift/candidate rows share one policy and are dependent; "
+                "pooled and per-shift correlations are descriptive only"
+            ),
             "Pooled_Spearman_rho": spearman_rho,
-            "Pooled_Spearman_p": s_p,
-            "N_Pairs": n_samples,
+            "N_Shift_Candidate_Evaluations": n_samples,
             "Per_Shift_Correlations": per_shift_rhos,
             "Proxy_Time_Seconds": proxy_total_time,
             "Ground_Truth_Time_Seconds": gt_total_time,
-            "Speedup_Factor": gt_total_time / proxy_total_time if proxy_total_time > 0 else 0
+            "Observed_Rollout_to_Proxy_Timing_Ratio": (
+                gt_total_time / proxy_total_time if proxy_total_time > 0 else 0
+            ),
         }, f, indent=2)
 
 if __name__ == "__main__":

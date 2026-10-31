@@ -57,6 +57,7 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
     fit_seeds = set(protocol["fit_seeds"])
     regimes_by_cell = {}
     score_directions_by_cell = {}
+    orientation_reliability_by_cell = {}
 
     results = {
         "protocol_version": protocol["protocol_version"],
@@ -155,10 +156,19 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
                     continue
                 score_directions_by_cell[cell] = {}
                 for predictor in predictors:
-                    prediction = evaluate_predictor(fit_rows, test_rows, predictor)
+                    prediction = evaluate_predictor(
+                        fit_rows,
+                        test_rows,
+                        predictor,
+                        protocol["orientation_auc_margin"],
+                    )
                     score_directions_by_cell[cell][predictor] = prediction[
                         "score_direction"
                     ]
+                    if predictor == protocol["primary_predictor"]:
+                        orientation_reliability_by_cell[cell] = prediction[
+                            "orientation_reliable"
+                        ]
                     correlation = correlation_metrics(test_rows, predictor)
                     classification = classify_correlation_auroc(
                         correlation["spearman_rho"],
@@ -185,7 +195,10 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
             "environment": result["environment"],
             "held_out_family": result["held_out_family"],
             "regime": result["regime"],
-            "discordant": result["correlation_auroc_classification"]["discordant"],
+            "discordant": (
+                result["correlation_auroc_classification"]["discordant"]
+                if result["prediction"]["orientation_reliable"] else None
+            ),
             "correlation_class": result[
                 "correlation_auroc_classification"
             ]["correlation_class"],
@@ -195,16 +208,20 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
             "spearman_rho": result["correlation"]["spearman_rho"],
             "auroc": result["prediction"]["auroc"],
             "failure_prevalence": result["prediction"]["prevalence"],
+            "orientation_reliable": result["prediction"]["orientation_reliable"],
         }
         for result in results["held_out_family_results"]
         if result["predictor"] == primary_predictor
     ]
-    cliff_cells = [
-        cell for cell in primary_cells if cell["regime"] == "cliff_edge"
+    regime_cells = [
+        cell for cell in primary_cells
+        if cell["regime"] in ("cliff_edge", "graded")
     ]
+    cliff_cells = [cell for cell in regime_cells if cell["regime"] == "cliff_edge"]
     h1_evaluable = [
         cell for cell in cliff_cells
-        if cell["correlation_class"] in ("weak", "strong")
+        if cell["orientation_reliable"]
+        and cell["correlation_class"] in ("weak", "strong")
         and cell["auroc_class"] in ("low", "high")
     ]
     h1_supporting = [
@@ -220,11 +237,13 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
                 if h1_evaluable else None
             ),
             "indeterminate_cliff_edge_cells": len(cliff_cells) - len(h1_evaluable),
-            "prevalence_context": [
+        },
+        "prevalence_context": [
                 {
                     "agent": cell["agent"],
                     "environment": cell["environment"],
                     "family": cell["held_out_family"],
+                    "regime": cell["regime"],
                     "failure_prevalence": cell["failure_prevalence"],
                     "observed_absolute_spearman": abs(cell["spearman_rho"]),
                     "approx_expected_absolute_spearman": float(
@@ -237,9 +256,8 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
                     ),
                     "reference_status": "descriptive_approximation",
                 }
-                for cell in cliff_cells
+                for cell in regime_cells
             ],
-        },
         "H3": [],
     }
 
@@ -307,6 +325,7 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
                     for cell in score_directions_by_cell
                     if primary_predictor in score_directions_by_cell[cell]
                 },
+                orientation_reliability=orientation_reliability_by_cell,
             )
             primary_test["seed_blocked_bootstrap_95_ci"] = bootstrap
         except ValueError as error:
@@ -393,7 +412,16 @@ def main(argv: List[str] = None) -> int:
         analyze_table(args.input, args.output, args.protocol)
         print("Analysis written to {}.".format(args.output))
         return 0
-    except (OSError, ValueError, ProtocolError, KeyError) as error:
+    except KeyError as error:
+        missing_key = error.args[0] if error.args else "unknown"
+        print(
+            "Error: Missing required configuration or data field {!r}.".format(
+                missing_key
+            ),
+            file=sys.stderr,
+        )
+        return 2
+    except (OSError, ValueError, ProtocolError) as error:
         print("Error: {}".format(error), file=sys.stderr)
         return 2
 

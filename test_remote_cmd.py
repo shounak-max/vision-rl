@@ -1,7 +1,16 @@
 import os
 HOST = os.environ.get("VISION_RL_SSH_HOST")
-PORT = 2222
+PORT = int(os.environ.get("VISION_RL_SSH_PORT", "2222"))
 USERNAME = os.environ.get("VISION_RL_SSH_USERNAME")
+REMOTE_DIR = os.environ.get(
+    "VISION_RL_REMOTE_DIR",
+    os.path.join("/home", USERNAME or "user", "vision-rl"),
+)
+REMOTE_ACTIVATE_SCRIPT = os.environ.get(
+    "VISION_RL_REMOTE_ACTIVATE_SCRIPT",
+    os.path.join("/home", USERNAME or "user", "miniconda3", "bin", "activate"),
+)
+REMOTE_CONDA_ENV = os.environ.get("VISION_RL_REMOTE_CONDA_ENV", "rl_env")
 
 if __name__ == "__main__":
     import paramiko
@@ -13,7 +22,11 @@ if __name__ == "__main__":
     ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
     ssh.connect(HOST, port=PORT, username=USERNAME)
 
-    cmd = "source /home/piyush/miniconda3/bin/activate && conda activate rl_env && cd /home/piyush/vision-rl && PYTHONPATH=. python3 baselines/predictive_augmentation_selection.py"
+    cmd = (
+        f"source {REMOTE_ACTIVATE_SCRIPT} && conda activate {REMOTE_CONDA_ENV} "
+        f"&& cd {REMOTE_DIR} && PYTHONPATH=. python3 "
+        "baselines/predictive_augmentation_selection.py"
+    )
     print("Running cmd...")
     stdin, stdout, stderr = ssh.exec_command(cmd)
 

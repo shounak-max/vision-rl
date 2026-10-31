@@ -3,6 +3,10 @@ import os
 HOST = os.environ.get("VISION_RL_SSH_HOST")
 USERNAME = os.environ.get("VISION_RL_SSH_USERNAME")
 PORT = int(os.environ.get("VISION_RL_SSH_PORT", "2222"))
+REMOTE_DIR = os.environ.get(
+    "VISION_RL_REMOTE_DIR",
+    os.path.join("/home", USERNAME or "user", "vision-rl"),
+)
 
 def main():
     import paramiko
@@ -16,7 +20,7 @@ def main():
 
     sftp = ssh.open_sftp()
     try:
-        models = sftp.listdir("/home/piyush/vision-rl/results/models")
+        models = sftp.listdir(f"{REMOTE_DIR}/results/models")
         print("SAVED MODELS IN RESULTS/MODELS:")
         for m in models:
             print(" -", m)

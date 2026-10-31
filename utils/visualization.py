@@ -29,8 +29,6 @@ def generate_environment_grid(output_path="results/figures/env_grid.png"):
     
     envs = [
         ("Single Object Tracking", gym.make("SingleObjectTracking-v0")),
-        ("Multi Object Tracking", gym.make("MultiObjectTracking-v0")),
-        ("Active Tracking (Viewport)", gym.make("ActiveTracking-v0")),
         ("Multi-Stage Navigation", gym.make("MultiStageNavigation-v0"))
     ]
     

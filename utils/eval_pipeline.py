@@ -30,10 +30,12 @@ def compute_stat_ci95(data):
         "formatted": f"{mean:.2f} ± {ci95:.2f}"
     }
 
-def make_env_canonical(env_id):
+def make_env_canonical(env_id, seed=0, procgen_split="evaluation"):
     if env_id.startswith("procgen"):
         from envs.wrappers import ProcgenGymnasiumWrapper
-        return ProcgenGymnasiumWrapper(env_id)
+        return ProcgenGymnasiumWrapper(
+            env_id, split=procgen_split, seed=seed
+        )
     return gym.make(env_id)
 
 def evaluate_policy_canonical(model, env_id, n_episodes=20, seed=42, wrapper_cls=None, wrapper_kwargs=None, is_bc=False, bc_policy=None):

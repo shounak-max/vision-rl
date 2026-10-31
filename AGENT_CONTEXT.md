@@ -31,7 +31,7 @@ This repository (`vision-rl`) is a high-throughput (**>300 FPS per CPU core**) c
 vision-rl/
 ├── envs/                         # Gymnasium visual environments & wrappers
 │   ├── __init__.py               # Gymnasium registration
-│   ├── tracking_envs.py          # SingleObjectTracking-v0, MultiObjectTracking-v0, ActiveTracking-v0
+│   ├── tracking_envs.py          # SingleObjectTracking-v0
 │   ├── navigation_envs.py        # MultiStageNavigation-v0 (long-horizon key-door navigation)
 │   └── wrappers.py               # DataAugmentation, Noise, Distractor, Viewpoint wrappers
 ├── baselines/                    # Benchmark execution scripts

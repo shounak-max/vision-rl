@@ -113,3 +113,8 @@
 ### Exact Next Steps
 - Execute `baselines/run_scale_experiment.py` on the remote GPU server (`10.0.24.7`).
 - Incorporate the photometric/appearance-based claim scoping into the Methods section of the paper manuscript.
+
+## Current audit correction
+- The legacy `predictive_augmentation_selection.py` script applies transforms at test time to one fixed policy and samples proxy features only from reset observations. It does not establish training-time augmentation selection.
+- Its pooled rank rows share shift/candidate structure, so the historical pooled p-value is not valid inferential evidence. The reported timing ratio excludes training and is not an end-to-end speedup.
+- The current preregistered study has no episode-level outcome table; older benchmark results do not open its run gate.

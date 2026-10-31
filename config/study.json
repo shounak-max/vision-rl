@@ -74,13 +74,13 @@
   "bootstrap_replicates": 2000,
   "permutation_replicates": 10000,
   "analysis_random_seed": 20261031,
+  "orientation_auc_margin": 0.05,
   "run_gate": {
     "full_study_enabled": false,
     "pilot_environment": "visual_pursuit",
     "analysis_design_blockers": [
       "Revise H1 to account for the mathematical dependence between binary-outcome Spearman correlation, AUROC, and failure prevalence.",
-      "Implement and verify disjoint Procgen training and evaluation level ranges with reproducible reset seeding.",
-      "Make stochastic visual-shift wrappers reproducible from episode seeds and keep viewpoint transforms fixed within an episode."
+      "Verify the Procgen adapter uses disjoint training/evaluation levels and reproducible seeded resets in the installed legacy Gym/Procgen runtime."
     ],
     "success_definitions": {
       "visual_pursuit": {

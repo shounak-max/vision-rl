@@ -39,16 +39,16 @@ pip install -r requirements.txt
 
 ## 3. Quick Start: Execute Core Research Experiments
 
-To run the predictive augmentation proxy evaluation, Procgen smoke test, and scale-up experiments:
+To run the exploratory test-time transform probe and legacy Procgen/scale-up scripts:
 
 ```bash
-# 1. Test-Time Augmentation (TTA) Predictive Selection Proxy:
+# 1. Exploratory test-time transform sensitivity (not training-time selection):
 python baselines/predictive_augmentation_selection.py
 
-# 2. Procgen Smoke Test (300k steps, 50 layout-randomized episodes/shift):
+# 2. Procgen Smoke Test (300k steps, 50 held-out-level episodes/shift):
 python baselines/smoke_procgen.py
 
-# 3. Scale-Up Benchmark (Procgen + Navigation across 5 seeds x 10M timesteps):
+# 3. Legacy Scale-Up Benchmark (3 seeds x 2.5M Procgen steps):
 python baselines/run_scale_experiment.py
 ```
 
@@ -56,17 +56,18 @@ python baselines/run_scale_experiment.py
 
 ## 4. Detailed Module-by-Module Execution Guide
 
-### Step 1: Predictive Augmentation Selection via TTA Proxy
-Evaluates representation distance ($d_{\text{Euc}}$) as a cheap proxy to rank 13 candidate data augmentation strategies across 10 visual distribution shifts.
+### Step 1: Exploratory Test-Time Transform Sensitivity
+Applies candidate image transforms to a fixed PPO policy under visual shifts. This is a legacy exploratory sensitivity probe; it does not train policies with different augmentations and therefore does not test training-time augmentation selection. Its feature proxy uses reset observations rather than rollout states. The pooled shift/candidate rows are dependent, so correlations and timing ratios are descriptive only and should not be read as inferential evidence or end-to-end speedups.
 ```bash
 python baselines/predictive_augmentation_selection.py
 ```
 - **Outputs:** `results/tables/predictive_selection.csv` and `results/tables/predictive_selection_summary.json`.
+- **Procgen note:** training defaults to levels `[0, 500)` and evaluation uses `[10000, 10500)`; verify the installed Gym/Procgen runtime before using results as evidence.
 
 ---
 
 ### Step 2: Procgen Procedural Generalization Smoke Test
-Trains PPO on `procgen:procgen-coinrun-v0` and evaluates policy performance across 11 perturbation wrappers (Noise, Distractor, Viewpoint, Occlusion, Blur, Compound) using 50 layout-randomized seeds.
+Trains PPO on `procgen:procgen-coinrun-v0` and evaluates policy performance across 11 perturbation wrappers (Noise, Distractor, Viewpoint, Occlusion, Blur, Compound) on 50 episodes from the held-out evaluation-level range.
 ```bash
 python baselines/smoke_procgen.py
 ```
@@ -75,13 +76,26 @@ python baselines/smoke_procgen.py
 ---
 
 ### Step 3: Multi-Seed Scale-Up Experiment (Remote GPU / Cluster)
-Trains `PPO_Standard` and `DataAugmented_PPO` across 5 random seeds (`[0, 42, 100, 123, 999]`) and 10M timesteps on Procgen. Computes Pearson $r$ and Spearman $\rho$ correlation between representation distance and return degradation.
+Trains `PPO_Standard` and `DataAugmented_PPO` across 3 seeds (`[0, 42, 100]`) and 2.5M timesteps per Procgen run. This legacy benchmark is not the preregistered failure-prediction study.
 ```bash
 python baselines/run_scale_experiment.py
 # Or launch detached background job on remote GPU server:
 python baselines/deploy_remote_gpu.py
 ```
 - **Outputs:** `results/tables/scale_experiment_results.csv` and `results/tables/correlation_procgen_procgen-coinrun-v0.json`.
+- **Configuration:** currently 3 seeds (`[0, 42, 100]`) and 2.5M Procgen steps per run.
+
+---
+
+### Study protocol and analysis commands
+The full confirmatory study remains gated. Validate the frozen protocol before preparing data:
+```bash
+pip install -e .
+vision-rl-study validate-protocol
+vision-rl-study validate-episodes path/to/episodes.csv
+vision-rl-study analyze path/to/episodes.csv --output results/tables/study_analysis.json
+```
+Do not treat legacy benchmark outputs as study results; the confirmatory episode-level table has not been collected.
 
 ---
 

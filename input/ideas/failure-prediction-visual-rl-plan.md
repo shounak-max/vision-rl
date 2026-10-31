@@ -30,7 +30,7 @@ Classify absolute Spearman correlation as **weak** (≤0.30), **intermediate** (
 - Agents: DrQ-v2, SVEA, TACO, and one robustness-oriented method (MaDi, subject to implementation and compute feasibility).
 - Environments: Visual Pursuit, Procgen CoinRun, and one Distracting Control Suite task.
 - Train 10 independent seeds per agent and environment: 120 training runs total.
-- For Procgen, freeze disjoint training and evaluation level ranges and verify that reset seeds actually control the legacy environment before collecting confirmatory outcomes.
+- For Procgen, use sequential training levels `[0, 500)` and evaluation levels `[10000, 10500)` in the adapter. Verify that seeded resets reproduce observations within each range in the installed legacy Gym/Procgen runtime before collecting confirmatory outcomes.
 - Use official implementations and record code revisions, configuration, hardware, and dependencies.
 
 The one-environment pilot must confirm that each selected implementation, environment, shift, and outcome can be run and logged before the full training campaign.
