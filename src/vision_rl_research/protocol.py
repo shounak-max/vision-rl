@@ -82,7 +82,10 @@ def validate_protocol(protocol: Dict[str, Any]) -> None:
             raise ProtocolError("{} must be positive.".format(key))
 
     gate = protocol["run_gate"]
-    if gate["full_study_enabled"] and gate["remaining_blockers"]:
+    analysis_blockers = gate.get("analysis_design_blockers", [])
+    if gate["full_study_enabled"] and (
+        gate["remaining_blockers"] or analysis_blockers
+    ):
         raise ProtocolError("Full study cannot be enabled while blockers remain.")
 
 
@@ -90,6 +93,7 @@ def run_gate_blockers(protocol: Dict[str, Any]) -> List[str]:
     """Return blockers that prevent starting the confirmatory full study."""
     gate = protocol["run_gate"]
     blockers = list(gate["remaining_blockers"])
+    blockers.extend(gate.get("analysis_design_blockers", []))
     for environment, definition in gate["success_definitions"].items():
         if definition["status"] == "unresolved":
             blockers.append(

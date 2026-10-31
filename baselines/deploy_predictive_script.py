@@ -2,20 +2,21 @@ import os
 import sys
 import time
 import paramiko
-
-HOST = "10.0.24.7"
+HOST = os.environ.get("VISION_RL_SSH_HOST")
 PORT = 2222
-USERNAME = "piyush"
-PASSWORD = "2£K40d#N"
+USERNAME = os.environ.get("VISION_RL_SSH_USERNAME")
 
 REMOTE_DIR = "/home/piyush/vision-rl"
 LOCAL_WORKSPACE = "d:/gitfork/vision rl"
 
 def connect_ssh():
+    if not HOST or not USERNAME:
+        raise RuntimeError("Set VISION_RL_SSH_HOST and VISION_RL_SSH_USERNAME before connecting.")
     ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.load_system_host_keys()
+    ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
     try:
-        ssh.connect(HOST, port=PORT, username=USERNAME, password=PASSWORD, timeout=30)
+        ssh.connect(HOST, port=PORT, username=USERNAME, timeout=30)
         transport = ssh.get_transport()
         if transport:
             transport.set_keepalive(15)

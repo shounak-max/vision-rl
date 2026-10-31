@@ -58,13 +58,19 @@ def _binary_metrics(labels: np.ndarray, scores: np.ndarray) -> Dict[str, float]:
     auc = float(stats.mannwhitneyu(
         scores[positive], scores[negatives], alternative="two-sided"
     ).statistic / (positive.sum() * negatives.sum()))
-    precision_recall = stats.rankdata(scores, method="average")
     order = np.argsort(-scores, kind="mergesort")
+    sorted_scores = scores[order]
     sorted_labels = labels[order]
     true_positives = np.cumsum(sorted_labels == 1)
     false_positives = np.cumsum(sorted_labels == 0)
-    precision = true_positives / (true_positives + false_positives)
-    recall = true_positives / positive.sum()
+    group_ends = np.r_[
+        np.flatnonzero(sorted_scores[:-1] != sorted_scores[1:]),
+        len(sorted_scores) - 1,
+    ]
+    precision = true_positives[group_ends] / (
+        true_positives[group_ends] + false_positives[group_ends]
+    )
+    recall = true_positives[group_ends] / positive.sum()
     previous_recall = np.concatenate(([0.0], recall[:-1]))
     auprc = float(np.sum((recall - previous_recall) * precision))
     prevalence = float(np.mean(positive))
@@ -76,34 +82,46 @@ def _binary_metrics(labels: np.ndarray, scores: np.ndarray) -> Dict[str, float]:
     }
 
 
-def fit_failure_threshold(
+def fit_failure_score_direction(
     fit_rows: Sequence[Dict[str, str]], predictor: str
+) -> Tuple[int, float]:
+    """Orient scores using fit rows only so larger values indicate failure."""
+    failures = 1.0 - _column(fit_rows, "success")
+    if not np.all(np.isin(failures, (0.0, 1.0))):
+        raise ValueError("success must contain only 0 and 1.")
+    raw_auc = _binary_metrics(failures, _column(fit_rows, predictor))["auroc"]
+    direction = -1 if raw_auc < 0.5 else 1
+    return direction, raw_auc
+
+
+def fit_failure_threshold(
+    fit_rows: Sequence[Dict[str, str]], predictor: str, score_direction: int = 1
 ) -> float:
     """Choose the score cutoff maximizing Youden's J on fit data only."""
-    scores = _column(fit_rows, predictor)
+    if score_direction not in (-1, 1):
+        raise ValueError("score_direction must be -1 or 1.")
+    scores = score_direction * _column(fit_rows, predictor)
     failures = 1.0 - _column(fit_rows, "success")
     if not np.all(np.isin(failures, (0.0, 1.0))):
         raise ValueError("success must contain only 0 and 1.")
     if len(np.unique(failures)) != 2:
         raise ValueError("Threshold fitting requires both outcome classes.")
 
-    candidates = np.unique(scores)
-    thresholds = np.concatenate((
-        [np.nextafter(candidates[0], -np.inf)],
-        (candidates[:-1] + candidates[1:]) / 2.0,
-        [candidates[-1]],
-    ))
-    best_threshold = float(thresholds[0])
-    best_score = -math.inf
-    for threshold in thresholds:
-        predicted = scores >= threshold
-        true_positive_rate = np.mean(predicted[failures == 1.0])
-        false_positive_rate = np.mean(predicted[failures == 0.0])
-        youden_j = true_positive_rate - false_positive_rate
-        if youden_j > best_score:
-            best_score = youden_j
-            best_threshold = float(threshold)
-    return best_threshold
+    order = np.argsort(-scores, kind="mergesort")
+    sorted_scores = scores[order]
+    sorted_failures = failures[order]
+    group_ends = np.r_[
+        np.flatnonzero(sorted_scores[:-1] != sorted_scores[1:]),
+        len(sorted_scores) - 1,
+    ]
+    true_positives = np.cumsum(sorted_failures == 1.0)[group_ends]
+    false_positives = np.cumsum(sorted_failures == 0.0)[group_ends]
+    youden_j = (
+        true_positives / np.sum(failures == 1.0)
+        - false_positives / np.sum(failures == 0.0)
+    )
+    best_index = int(np.argmax(youden_j))
+    return float(sorted_scores[group_ends[best_index]])
 
 
 def evaluate_predictor(
@@ -111,8 +129,11 @@ def evaluate_predictor(
     test_rows: Sequence[Dict[str, str]],
     predictor: str,
 ) -> Dict[str, Any]:
-    threshold = fit_failure_threshold(fit_rows, predictor)
-    scores = _column(test_rows, predictor)
+    score_direction, raw_fit_auroc = fit_failure_score_direction(
+        fit_rows, predictor
+    )
+    threshold = fit_failure_threshold(fit_rows, predictor, score_direction)
+    scores = score_direction * _column(test_rows, predictor)
     labels = 1.0 - _column(test_rows, "success")
     metrics = _binary_metrics(labels, scores)
     predicted = scores >= threshold
@@ -123,6 +144,8 @@ def evaluate_predictor(
     )
     accuracy = float(np.mean(predicted == actual))
     metrics.update({
+        "score_direction": score_direction,
+        "raw_fit_auroc": raw_fit_auroc,
         "threshold_fit_on_training_families": threshold,
         "threshold_test_accuracy": accuracy,
         "threshold_test_sensitivity": sensitivity,
@@ -272,6 +295,7 @@ def seed_blocked_bootstrap_ci(
     test_seeds: Sequence[int],
     replicates: int,
     random_seed: int,
+    score_directions: Optional[Dict[Tuple[str, str, str], int]] = None,
 ) -> Dict[str, Any]:
     """Bootstrap test seeds within each agent/environment, keeping their rows together."""
     if replicates < 1:
@@ -317,12 +341,16 @@ def seed_blocked_bootstrap_ci(
             labels = 1.0 - _column(sampled_rows, "success")
             if len(np.unique(labels)) != 2:
                 continue
+            direction = (
+                score_directions.get(cell, 1)
+                if score_directions is not None else 1
+            )
             rho = float(stats.spearmanr(
                 _column(sampled_rows, predictor),
                 _column(sampled_rows, "success"),
             ).statistic)
             auroc = _binary_metrics(
-                labels, _column(sampled_rows, predictor)
+                labels, direction * _column(sampled_rows, predictor)
             )["auroc"]
             classification = classify_correlation_auroc(rho, auroc, cutoffs)
             bootstrap_cells.append({

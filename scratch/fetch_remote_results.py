@@ -1,17 +1,18 @@
 import os
 import paramiko
-
-HOST = "10.0.24.7"
+HOST = os.environ.get("VISION_RL_SSH_HOST")
 PORT = 2222
-USERNAME = "piyush"
-PASSWORD = "2£K40d#N"
+USERNAME = os.environ.get("VISION_RL_SSH_USERNAME")
 REMOTE_DIR = "/home/piyush/vision-rl"
 LOCAL_WORKSPACE = "d:/gitfork/vision rl"
 
 print("=== CHECKING COMPLETED SCALE EXPERIMENT RESULTS & SYNCING ===")
+if not HOST or not USERNAME:
+    raise RuntimeError("Set VISION_RL_SSH_HOST and VISION_RL_SSH_USERNAME before connecting.")
 ssh = paramiko.SSHClient()
-ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-ssh.connect(HOST, port=PORT, username=USERNAME, password=PASSWORD)
+ssh.load_system_host_keys()
+ssh.set_missing_host_key_policy(paramiko.RejectPolicy())
+ssh.connect(HOST, port=PORT, username=USERNAME)
 
 # 1. Process Status
 stdin, stdout, stderr = ssh.exec_command("ps -ef | grep run_scale_experiment | grep -v grep")

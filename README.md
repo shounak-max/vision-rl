@@ -63,6 +63,18 @@ fit and test split.
 The current four-family allocation is 14,400 episodes (30 episodes per
 severity cell across 10 training seeds), not 144,000.
 
+The initial H1 thresholds are descriptive until the prevalence dependence
+between binary-outcome Spearman correlation and AUROC is addressed in a
+protocol amendment. Analysis outputs include failure prevalence and an
+approximate prevalence reference; they are not experimental findings by
+themselves. `validate-episodes` checks full-study coverage by default; use
+`--allow-incomplete` only for pilot or subset tables.
+
+Legacy remote scripts now read `VISION_RL_SSH_HOST` and
+`VISION_RL_SSH_USERNAME`, use system known-host verification, and authenticate
+with configured SSH keys/agent. Any credential previously committed still
+requires rotation and removal from Git history.
+
 ## Tests
 
 ```powershell

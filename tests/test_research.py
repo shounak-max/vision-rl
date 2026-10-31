@@ -4,7 +4,10 @@ import os
 import tempfile
 import unittest
 
+import numpy as np
+
 from vision_rl_research.analysis import (
+    _binary_metrics,
     blocked_regime_permutation_test,
     classify_correlation_auroc,
     classify_regime,
@@ -12,7 +15,11 @@ from vision_rl_research.analysis import (
     family_seed_split,
     seed_blocked_bootstrap_ci,
 )
-from vision_rl_research.data import EpisodeDataError, validate_episode_rows
+from vision_rl_research.data import (
+    EpisodeDataError,
+    validate_episode_completeness,
+    validate_episode_rows,
+)
 from vision_rl_research.cli import analyze_table
 from vision_rl_research.protocol import (
     ProtocolError,
@@ -85,6 +92,46 @@ class EpisodeDataTests(unittest.TestCase):
         }
         validate_episode_rows([row], list(row))
 
+    def test_requires_nonempty_predictor_values(self):
+        row = {
+            "agent": "agent",
+            "environment": "env",
+            "training_seed": "1",
+            "shift_family": "noise",
+            "severity": "0.5",
+            "episode_seed": "10",
+            "episode_return": "2.0",
+            "success": "1",
+            "centroid_distance": "",
+        }
+        with self.assertRaisesRegex(EpisodeDataError, "missing predictor value"):
+            validate_episode_rows([row], list(row), ["centroid_distance"])
+
+    def test_completeness_checks_total_and_seed_allocation(self):
+        protocol = {
+            "agents": ["a"],
+            "environments": ["e"],
+            "shift_families": ["f"],
+            "training_seeds": [1, 2],
+            "severity_levels": 2,
+            "episodes_per_level": 2,
+            "expected_episodes": 4,
+        }
+        rows = [
+            {
+                "agent": "a",
+                "environment": "e",
+                "shift_family": "f",
+                "severity": str(severity),
+                "training_seed": str(seed),
+            }
+            for severity in (0.0, 1.0)
+            for seed in (1, 2)
+        ]
+        validate_episode_completeness(rows, protocol)
+        with self.assertRaisesRegex(EpisodeDataError, "Expected 4 episodes"):
+            validate_episode_completeness(rows[:-1], protocol)
+
 
 class AnalysisTests(unittest.TestCase):
     def test_family_and_seed_split_excludes_heldout_data_from_fit(self):
@@ -115,6 +162,37 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(result["auroc"], 1.0)
         self.assertEqual(result["auprc"], 1.0)
         self.assertGreater(result["threshold_fit_on_training_families"], 0.1)
+
+    def test_predictor_sign_is_oriented_from_fit_rows_only(self):
+        fit_rows = [
+            {"centroid_distance": "1.0", "success": "1"},
+            {"centroid_distance": "0.9", "success": "1"},
+            {"centroid_distance": "0.1", "success": "0"},
+            {"centroid_distance": "0.0", "success": "0"},
+        ]
+        test_rows = [
+            {"centroid_distance": "1.0", "success": "1"},
+            {"centroid_distance": "0.9", "success": "1"},
+            {"centroid_distance": "0.1", "success": "0"},
+            {"centroid_distance": "0.0", "success": "0"},
+        ]
+        result = evaluate_predictor(fit_rows, test_rows, "centroid_distance")
+        self.assertEqual(result["score_direction"], -1)
+        self.assertEqual(result["raw_fit_auroc"], 0.0)
+        self.assertEqual(result["auroc"], 1.0)
+        self.assertEqual(result["threshold_test_accuracy"], 1.0)
+
+    def test_average_precision_is_invariant_to_order_with_tied_scores(self):
+        first = _binary_metrics(
+            labels=np.array([1, 0, 1, 0]),
+            scores=np.array([1.0, 1.0, 0.0, 0.0]),
+        )
+        second = _binary_metrics(
+            labels=np.array([0, 1, 0, 1]),
+            scores=np.array([1.0, 1.0, 0.0, 0.0]),
+        )
+        self.assertEqual(first["auprc"], second["auprc"])
+        self.assertEqual(first["auprc"], 0.5)
 
     def test_regime_interpolates_crossings_and_classifies_width(self):
         points = [(0.0, 1.0), (0.1, 0.95), (0.2, 0.05), (1.0, 0.0)]
@@ -237,8 +315,8 @@ class AnalysisCliTests(unittest.TestCase):
                         trial = (seed - 1) * 3 + episode_index
                         success = int(trial < success_count)
                         row = {
-                            "agent": "agent",
-                            "environment": "environment",
+                            "agent": protocol["agents"][0],
+                            "environment": protocol["environments"][0],
                             "training_seed": seed,
                             "shift_family": family,
                             "severity": severity,
@@ -272,10 +350,22 @@ class AnalysisCliTests(unittest.TestCase):
                 result = json.load(file)
 
         self.assertEqual(result["episode_count"], 480)
+        self.assertEqual(
+            result["coverage"]["expected_agent_environment_family_cells"],
+            48,
+        )
+        self.assertEqual(
+            result["coverage"]["observed_agent_environment_family_cells"],
+            4,
+        )
         self.assertEqual(result["primary_test"]["status"], "estimated")
         self.assertIn("two_sided_permutation_p", result["primary_test"])
         self.assertIn("seed_blocked_bootstrap_95_ci", result["primary_test"])
         self.assertIn("supporting_cell_rate", result["hypothesis_summaries"]["H1"])
+        self.assertEqual(
+            len(result["hypothesis_summaries"]["H1"]["prevalence_context"]),
+            2,
+        )
         self.assertEqual(len(result["hypothesis_summaries"]["H3"]), 11)
         self.assertTrue(all(
             item["interpretation"] == "exploratory_descriptive"

@@ -77,6 +77,11 @@
   "run_gate": {
     "full_study_enabled": false,
     "pilot_environment": "visual_pursuit",
+    "analysis_design_blockers": [
+      "Revise H1 to account for the mathematical dependence between binary-outcome Spearman correlation, AUROC, and failure prevalence.",
+      "Implement and verify disjoint Procgen training and evaluation level ranges with reproducible reset seeding.",
+      "Make stochastic visual-shift wrappers reproducible from episode seeds and keep viewpoint transforms fixed within an episode."
+    ],
     "success_definitions": {
       "visual_pursuit": {
         "metric": "episode_mean_cle_pixels",

@@ -21,6 +21,8 @@ The study tests predictive transfer across unseen shift families. It does not te
 
 Classify absolute Spearman correlation as **weak** (≤0.30), **intermediate** (>0.30 and <0.50), or **strong** (≥0.50). Classify held-out AUROC as **low** (≤0.60), **intermediate** (>0.60 and <0.80), or **high** (≥0.80). A cell is category-discordant when both measures are outside the intermediate band but fall in opposite categories (weak/low versus strong/high). Cells with either measure intermediate are indeterminate for this primary classification and remain in continuous-metric analyses. Report the number and characteristics of indeterminate cells.
 
+**Interpretation blocker — binary-outcome prevalence:** Spearman correlation with a binary outcome is not independent of AUROC and failure prevalence. Under common continuous-score assumptions, a useful approximation is `|rho| ≈ sqrt(12 p (1-p)) (AUROC - 0.5)`, where `p` is failure prevalence. Thus weak correlation plus high AUROC can arise from rare failures alone. The planned thresholds and H1 are descriptive until a prevalence-aware confirmatory estimand is preregistered. The analysis reports failure prevalence and the approximate prevalence reference per cell; do not interpret an H1 count as evidence of a distinct correlation-blindness effect without the protocol amendment.
+
 ## 3. Study design
 
 ### Agents and environments
@@ -28,6 +30,7 @@ Classify absolute Spearman correlation as **weak** (≤0.30), **intermediate** (
 - Agents: DrQ-v2, SVEA, TACO, and one robustness-oriented method (MaDi, subject to implementation and compute feasibility).
 - Environments: Visual Pursuit, Procgen CoinRun, and one Distracting Control Suite task.
 - Train 10 independent seeds per agent and environment: 120 training runs total.
+- For Procgen, freeze disjoint training and evaluation level ranges and verify that reset seeds actually control the legacy environment before collecting confirmatory outcomes.
 - Use official implementations and record code revisions, configuration, hardware, and dependencies.
 
 The one-environment pilot must confirm that each selected implementation, environment, shift, and outcome can be run and logged before the full training campaign.
@@ -36,6 +39,7 @@ The one-environment pilot must confirm that each selected implementation, enviro
 
 - Target four shift families: viewpoint, distractors, noise, and color. The pilot may establish that a family cannot be implemented as specified; document any exclusion before full training.
 - Use 10 ordered severity levels per family, including the unshifted reference where appropriate. Store the exact transformation parameters and randomization seeds.
+- All stochastic shift transforms must be seeded from episode reset seeds; a viewpoint transform is sampled once per episode, not independently per frame.
 - Evaluate 30 episodes per agent/environment/family/severity cell, distributed evenly across the 10 training seeds (three episodes per seed). This gives 14,400 episodes at four families: 4 agents × 3 environments × 4 families × 10 levels × 30 episodes. If only three families pass the pilot, the corresponding total is 10,800.
 - Do not inspect held-out-family test outcomes while choosing features, thresholds, or analysis settings.
 
@@ -130,12 +134,12 @@ Do not release incomplete or invalidated results as confirmatory evidence. Prese
 The following are preregistration blockers, not decisions to make after inspecting study outcomes:
 
 1. Task-native success definitions, including the CLE threshold and window for Visual Pursuit.
-2. The exact pilot environment/task and one DMC task.
+2. The exact pilot environment/task and one DMC task, plus disjoint and reproducible Procgen training/evaluation levels.
 3. Whether MaDi and all four shift families can be implemented with the available code and compute.
 4. The quantitative encoder-ablation pass criterion and random-policy reference.
 5. Feature-window length and forecast horizon H.
 6. The precise severity parameterization and repeatable episode-seed scheme.
-7. The implementation and calibration procedure for each predictor, including semantic masks and covariance regularization.
+7. Amend the H1/primary estimand to account for the relationship among binary-outcome Spearman correlation, AUROC, and failure prevalence; then freeze predictor orientation and calibration procedures, including semantic masks and covariance regularization.
 8. The analysis script for blocked permutations and seed-blocked bootstrap intervals.
 
 The numeric correlation, AUROC, and regime-width cutoffs in this document are fixed for the initial protocol. Any change after full-run outcomes are inspected must be labeled a protocol amendment and cannot replace the original confirmatory analysis.

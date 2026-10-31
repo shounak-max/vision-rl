@@ -17,7 +17,11 @@ from vision_rl_research.analysis import (
     family_seed_split,
     seed_blocked_bootstrap_ci,
 )
-from vision_rl_research.data import read_episode_table, validate_predictor_columns
+from vision_rl_research.data import (
+    read_episode_table,
+    validate_episode_completeness,
+    validate_predictor_columns,
+)
 from vision_rl_research.protocol import (
     ProtocolError,
     default_protocol_path,
@@ -44,14 +48,15 @@ def _write_json(path: str, payload: Dict[str, Any]) -> None:
 
 def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None:
     protocol = load_protocol(protocol_path)
-    rows, columns = read_episode_table(input_path)
     predictors = protocol["predictors"]
+    rows, columns = read_episode_table(input_path, predictors)
     validate_predictor_columns(columns, predictors)
     families = sorted({row["shift_family"] for row in rows})
     environments = sorted({row["environment"] for row in rows})
     agents = sorted({row["agent"] for row in rows})
     fit_seeds = set(protocol["fit_seeds"])
     regimes_by_cell = {}
+    score_directions_by_cell = {}
 
     results = {
         "protocol_version": protocol["protocol_version"],
@@ -60,7 +65,30 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
         "held_out_family_results": [],
         "regime_classifications": [],
         "primary_test": None,
+        "excluded_cells": [],
+        "coverage": {},
         "run_gate_blockers": run_gate_blockers(protocol),
+    }
+    expected_cells = {
+        (agent, environment, family)
+        for agent in protocol["agents"]
+        for environment in protocol["environments"]
+        for family in protocol["shift_families"]
+    }
+    observed_cells = {
+        (row["agent"], row["environment"], row["shift_family"])
+        for row in rows
+    }
+    missing_cells = sorted(expected_cells - observed_cells)
+    results["coverage"] = {
+        "expected_agent_environment_family_cells": len(expected_cells),
+        "observed_agent_environment_family_cells": len(
+            expected_cells & observed_cells
+        ),
+        "missing_cells": [
+            {"agent": agent, "environment": environment, "shift_family": family}
+            for agent, environment, family in missing_cells
+        ],
     }
 
     for agent in agents:
@@ -100,16 +128,37 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
                 ]
                 if not cell_rows:
                     continue
-                fit_rows, test_rows = family_seed_split(
-                    cell_rows,
-                    family,
-                    protocol["fit_seeds"],
-                    protocol["test_seeds"],
-                )
                 cell = (agent, environment, family)
-                regime = regimes_by_cell[cell]
+                regime = regimes_by_cell.get(cell)
+                if regime is None:
+                    results["excluded_cells"].append({
+                        "agent": agent,
+                        "environment": environment,
+                        "shift_family": family,
+                        "reason": "No fit-seed rows available for regime classification.",
+                    })
+                    continue
+                try:
+                    fit_rows, test_rows = family_seed_split(
+                        cell_rows,
+                        family,
+                        protocol["fit_seeds"],
+                        protocol["test_seeds"],
+                    )
+                except ValueError as error:
+                    results["excluded_cells"].append({
+                        "agent": agent,
+                        "environment": environment,
+                        "shift_family": family,
+                        "reason": str(error),
+                    })
+                    continue
+                score_directions_by_cell[cell] = {}
                 for predictor in predictors:
                     prediction = evaluate_predictor(fit_rows, test_rows, predictor)
+                    score_directions_by_cell[cell][predictor] = prediction[
+                        "score_direction"
+                    ]
                     correlation = correlation_metrics(test_rows, predictor)
                     classification = classify_correlation_auroc(
                         correlation["spearman_rho"],
@@ -134,6 +183,7 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
         {
             "agent": result["agent"],
             "environment": result["environment"],
+            "held_out_family": result["held_out_family"],
             "regime": result["regime"],
             "discordant": result["correlation_auroc_classification"]["discordant"],
             "correlation_class": result[
@@ -142,6 +192,9 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
             "auroc_class": result[
                 "correlation_auroc_classification"
             ]["auroc_class"],
+            "spearman_rho": result["correlation"]["spearman_rho"],
+            "auroc": result["prediction"]["auroc"],
+            "failure_prevalence": result["prediction"]["prevalence"],
         }
         for result in results["held_out_family_results"]
         if result["predictor"] == primary_predictor
@@ -167,6 +220,25 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
                 if h1_evaluable else None
             ),
             "indeterminate_cliff_edge_cells": len(cliff_cells) - len(h1_evaluable),
+            "prevalence_context": [
+                {
+                    "agent": cell["agent"],
+                    "environment": cell["environment"],
+                    "family": cell["held_out_family"],
+                    "failure_prevalence": cell["failure_prevalence"],
+                    "observed_absolute_spearman": abs(cell["spearman_rho"]),
+                    "approx_expected_absolute_spearman": float(
+                        np.sqrt(
+                            12.0
+                            * cell["failure_prevalence"]
+                            * (1.0 - cell["failure_prevalence"])
+                        )
+                        * abs(cell["auroc"] - 0.5)
+                    ),
+                    "reference_status": "descriptive_approximation",
+                }
+                for cell in cliff_cells
+            ],
         },
         "H3": [],
     }
@@ -230,6 +302,11 @@ def analyze_table(input_path: str, output_path: str, protocol_path: str) -> None
                 protocol["test_seeds"],
                 protocol["bootstrap_replicates"],
                 protocol["analysis_random_seed"],
+                score_directions={
+                    cell: score_directions_by_cell[cell][primary_predictor]
+                    for cell in score_directions_by_cell
+                    if primary_predictor in score_directions_by_cell[cell]
+                },
             )
             primary_test["seed_blocked_bootstrap_95_ci"] = bootstrap
         except ValueError as error:
@@ -271,6 +348,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_episodes_parser.add_argument("input")
     validate_episodes_parser.add_argument("--protocol", default=default_protocol_path())
+    validate_episodes_parser.add_argument(
+        "--allow-incomplete",
+        action="store_true",
+        help="Allow pilot/subset tables without full-study episode coverage.",
+    )
 
     analyze_parser = subparsers.add_parser(
         "analyze", help="Run leave-one-family-out prediction and regime analysis."
@@ -299,15 +381,19 @@ def main(argv: List[str] = None) -> int:
 
         if args.command == "validate-episodes":
             protocol = load_protocol(args.protocol)
-            rows, columns = read_episode_table(args.input)
+            rows, columns = read_episode_table(
+                args.input, protocol["predictors"]
+            )
             validate_predictor_columns(columns, protocol["predictors"])
+            if not args.allow_incomplete:
+                validate_episode_completeness(rows, protocol)
             print("Valid episode table: {} episodes.".format(len(rows)))
             return 0
 
         analyze_table(args.input, args.output, args.protocol)
         print("Analysis written to {}.".format(args.output))
         return 0
-    except (OSError, ValueError, ProtocolError) as error:
+    except (OSError, ValueError, ProtocolError, KeyError) as error:
         print("Error: {}".format(error), file=sys.stderr)
         return 2
 
